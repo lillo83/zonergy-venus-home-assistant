@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1
+
+HACS publication candidate. Repository metadata and validation were completed
+successfully; no functional changes were made to the inverter communication.
+
 ## 0.1.0
 
 First public release, tested with a Zonergy Venus6000-S1 inverter connected to
