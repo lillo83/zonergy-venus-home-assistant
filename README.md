@@ -4,7 +4,8 @@ Custom integration for **Zonergy Venus hybrid inverters** connected through an
 ESP8266/ESPHome RS485 gateway.
 
 > [!IMPORTANT]
-> Version 0.1.0 is the first test version. Reading is passive, while switches
+> Version 0.1.0 is the first public version, tested on a real installation.
+> Reading is passive, while switches
 > and number controls write real values to the inverter. Use the controls only
 > if their meaning and limits match your inverter model.
 
@@ -96,8 +97,9 @@ intend to use enabled.
 ## HACS publication status
 
 The repository is structured for HACS and includes HACS and Hassfest validation
-workflows. After real-device testing, passing checks and a GitHub release, it can
-be submitted to the HACS default repository list.
+workflows. Version 0.1.0 has been tested on a real inverter installation. After
+all repository checks pass, it can be submitted to the HACS default repository
+list.
 
 ## License
 

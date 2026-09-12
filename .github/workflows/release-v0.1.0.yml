@@ -1,0 +1,28 @@
+name: Release v0.1.0
+
+on:
+  push:
+    paths:
+      - ".github/workflows/release-v0.1.0.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create GitHub release if missing
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view v0.1.0 >/dev/null 2>&1; then
+            echo "Release v0.1.0 already exists"
+            exit 0
+          fi
+          gh release create v0.1.0 \
+            --target "${GITHUB_SHA}" \
+            --title "Zonergy Venus v0.1.0" \
+            --notes-file CHANGELOG.md
