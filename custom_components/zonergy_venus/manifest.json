@@ -1,0 +1,13 @@
+{
+  "domain": "zonergy_venus",
+  "name": "Zonergy Venus",
+  "codeowners": ["@lillo83"],
+  "config_flow": true,
+  "dependencies": ["esphome"],
+  "documentation": "https://github.com/lillo83/zonergy-venus-home-assistant",
+  "integration_type": "device",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/lillo83/zonergy-venus-home-assistant/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}

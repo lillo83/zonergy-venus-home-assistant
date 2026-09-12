@@ -1,0 +1,24 @@
+{
+  "config": {
+    "abort": {
+      "already_configured": "This Zonergy gateway is already configured"
+    },
+    "error": {
+      "cannot_connect": "Unable to connect to the ESPHome gateway",
+      "invalid_auth": "Invalid API password or encryption key",
+      "invalid_gateway": "The ESPHome node does not contain the expected Zonergy Venus entities"
+    },
+    "step": {
+      "user": {
+        "data": {
+          "encryption_key": "ESPHome API encryption key (optional)",
+          "host": "ESP8266 IP address or hostname",
+          "password": "Legacy ESPHome API password (optional)",
+          "port": "ESPHome API port"
+        },
+        "description": "Enter the network details of the ESP8266 connected to your Zonergy Venus inverter through RS485.",
+        "title": "Connect the Zonergy Venus gateway"
+      }
+    }
+  }
+}

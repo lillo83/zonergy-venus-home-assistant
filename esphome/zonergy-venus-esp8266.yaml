@@ -1,0 +1,895 @@
+esphome:
+  name: inverter-esp
+  friendly_name: Inverter Energia
+  project:
+    name: lillo83.zonergy_venus
+    version: "0.1.0"
+
+esp8266:
+  board: d1_mini
+
+logger:
+  baud_rate: 0
+  level: WARN
+
+api:
+  # Per usare la crittografia, decommenta queste due righe e aggiungi
+  # api_encryption_key in secrets.yaml. Inserisci poi la stessa chiave in HA.
+  # encryption:
+  #   key: !secret api_encryption_key
+
+ota:
+  - platform: esphome
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+web_server:
+  port: 80
+
+uart:
+  id: uart_bus
+  tx_pin: GPIO5        # D1 → DI
+  rx_pin: GPIO2        # D4 → RO
+  baud_rate: 115200
+  parity: NONE
+  stop_bits: 1
+  rx_buffer_size: 512
+
+modbus:
+  id: modbus1
+  uart_id: uart_bus
+  flow_control_pin: GPIO4   # D2 = DE+RE
+  send_wait_time: 500ms
+
+modbus_controller:
+  - id: inverter
+    modbus_id: modbus1
+    address: 1
+    update_interval: 6s
+    command_throttle: 1000ms
+    allow_duplicate_commands: false
+    max_cmd_retries: 2
+    offline_skip_updates: 5
+
+# =========================================================
+# SENSORI
+# =========================================================
+sensor:
+  - platform: wifi_signal
+    name: "Segnale Wi-Fi"
+    update_interval: 60s
+
+  # -------------------- BATTERIA --------------------
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Tensione Porta Batteria"
+    register_type: read
+    address: 2967
+    value_type: S_WORD
+    unit_of_measurement: "V"
+    device_class: voltage
+    state_class: measurement
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Corrente Porta Batteria"
+    register_type: read
+    address: 2968
+    value_type: S_WORD
+    unit_of_measurement: "A"
+    device_class: current
+    state_class: measurement
+    accuracy_decimals: 2
+    filters:
+      - multiply: 0.01
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Potenza Batteria"
+    id: potenza_batteria
+    register_type: read
+    address: 2969
+    value_type: S_WORD
+    unit_of_measurement: "W"
+    device_class: power
+    state_class: measurement
+    accuracy_decimals: 0
+    filters:
+      - lambda: |-
+          if (x > -6000 && x < 6000) return x;
+          return NAN;
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Capacità Sistema Batteria"
+    register_type: read
+    address: 3001
+    value_type: U_WORD
+    unit_of_measurement: "Ah"
+    state_class: measurement
+    accuracy_decimals: 0
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Tensione Media Sistema Batteria"
+    register_type: read
+    address: 3004
+    value_type: U_WORD
+    unit_of_measurement: "V"
+    device_class: voltage
+    state_class: measurement
+    accuracy_decimals: 2
+    filters:
+      - multiply: 0.01
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Corrente Totale Sistema Batteria"
+    register_type: read
+    address: 3005
+    value_type: S_WORD
+    unit_of_measurement: "A"
+    device_class: current
+    state_class: measurement
+    accuracy_decimals: 2
+    filters:
+      - multiply: 0.01
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "SOC Medio Batteria"
+    id: soc_medio
+    register_type: read
+    address: 3006
+    value_type: U_WORD
+    unit_of_measurement: "%"
+    device_class: battery
+    state_class: measurement
+    accuracy_decimals: 0
+    filters:
+      - sliding_window_moving_average:
+          window_size: 5
+          send_every: 1
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "SOC Batteria Max"
+    id: soc_max
+    register_type: read
+    address: 3007
+    value_type: U_WORD
+    unit_of_measurement: "%"
+    accuracy_decimals: 0
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "SOC Batteria Min"
+    id: soc_min
+    register_type: read
+    address: 3008
+    value_type: U_WORD
+    unit_of_measurement: "%"
+    accuracy_decimals: 0
+
+  - platform: template
+    name: "Delta SOC Batterie"
+    unit_of_measurement: "%"
+    accuracy_decimals: 0
+    lambda: |-
+      return id(soc_max).state - id(soc_min).state;
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Stato Comunicazione Batteria"
+    register_type: read
+    address: 2307
+    value_type: U_WORD
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Batteria - Carica Giornaliera"
+    register_type: read
+    address: 2541
+    value_type: U_WORD
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Batteria - Scarica Giornaliera"
+    register_type: read
+    address: 2548
+    value_type: U_WORD
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  # -------------------- PV1 --------------------
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Tensione PV1"
+    register_type: read
+    address: 2100
+    value_type: S_WORD
+    unit_of_measurement: "V"
+    device_class: voltage
+    state_class: measurement
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Corrente PV1"
+    register_type: read
+    address: 2112
+    value_type: S_WORD
+    unit_of_measurement: "A"
+    device_class: current
+    state_class: measurement
+    accuracy_decimals: 2
+    filters:
+      - multiply: 0.01
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Potenza PV1"
+    register_type: read
+    address: 2124
+    value_type: S_DWORD
+    unit_of_measurement: "W"
+    device_class: power
+    state_class: measurement
+    accuracy_decimals: 0
+
+  # -------------------- PV2 --------------------
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Tensione PV2"
+    register_type: read
+    address: 2101
+    value_type: S_WORD
+    unit_of_measurement: "V"
+    device_class: voltage
+    state_class: measurement
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Corrente PV2"
+    register_type: read
+    address: 2113
+    value_type: S_WORD
+    unit_of_measurement: "A"
+    device_class: current
+    state_class: measurement
+    accuracy_decimals: 2
+    filters:
+      - multiply: 0.01
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Potenza PV2"
+    register_type: read
+    address: 2126
+    value_type: S_DWORD
+    unit_of_measurement: "W"
+    device_class: power
+    state_class: measurement
+    accuracy_decimals: 0
+
+  # -------------------- PV TOTALI --------------------
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Corrente Totale PV"
+    id: corrente_totale_pv
+    register_type: read
+    address: 2239
+    value_type: S_DWORD
+    unit_of_measurement: "A"
+    device_class: current
+    state_class: measurement
+    accuracy_decimals: 2
+    filters:
+      - multiply: 0.01
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Potenza Totale PV"
+    id: potenza_totale_pv
+    register_type: read
+    address: 2241
+    value_type: U_DWORD
+    unit_of_measurement: "W"
+    device_class: power
+    state_class: measurement
+    accuracy_decimals: 0
+    filters:
+      - lambda: |-
+          if (x < 0 || x > 7000) return {};
+          return x;
+      - sliding_window_moving_average:
+          window_size: 5
+          send_every: 1
+
+  # -------------------- ENERGIE PV (dall'inverter) --------------------
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Energia Giornaliera PV Totale"
+    register_type: read
+    address: 2232
+    value_type: U_WORD
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Energia Mensile PV Totale"
+    register_type: read
+    address: 2233
+    value_type: U_DWORD
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Energia Annuale PV Totale"
+    register_type: read
+    address: 2235
+    value_type: U_DWORD
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Energia Totale PV Cumulativa"
+    register_type: read
+    address: 2237
+    value_type: U_DWORD
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  # -------------------- RETE --------------------
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Tensione Rete"
+    register_type: read
+    address: 2400
+    value_type: S_WORD
+    unit_of_measurement: "V"
+    device_class: voltage
+    state_class: measurement
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Corrente Rete"
+    register_type: read
+    address: 2401
+    value_type: S_WORD
+    unit_of_measurement: "A"
+    device_class: current
+    state_class: measurement
+    accuracy_decimals: 2
+    filters:
+      - multiply: 0.01
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Frequenza Rete"
+    register_type: read
+    address: 2402
+    value_type: S_WORD
+    unit_of_measurement: "Hz"
+    device_class: frequency
+    state_class: measurement
+    accuracy_decimals: 2
+    filters:
+      - multiply: 0.01
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Potenza Attiva Rete"
+    id: potenza_attiva_rete
+    register_type: read
+    address: 2403
+    value_type: S_DWORD
+    unit_of_measurement: "W"
+    device_class: power
+    state_class: measurement
+    accuracy_decimals: 0
+    filters:
+      - lambda: |-
+          if (x > -6000 && x < 6000) return x;
+          return NAN;
+
+  # -------------------- CARICO --------------------
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Tensione Carico"
+    register_type: read
+    address: 2445
+    value_type: S_WORD
+    unit_of_measurement: "V"
+    device_class: voltage
+    state_class: measurement
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Corrente Carico"
+    register_type: read
+    address: 2446
+    value_type: S_WORD
+    unit_of_measurement: "A"
+    device_class: current
+    state_class: measurement
+    accuracy_decimals: 2
+    filters:
+      - multiply: 0.01
+      - lambda: "return (x >= 0 && x < 50) ? x : 0;"
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Potenza Carico"
+    id: potenza_carico
+    register_type: read
+    address: 2447
+    value_type: S_DWORD
+    unit_of_measurement: "W"
+    device_class: power
+    state_class: measurement
+    accuracy_decimals: 0
+    filters:
+      - lambda: |-
+          if (x < -8000 || x > 8000) return {};
+          return x;
+
+  # -------------------- TEMPERATURE --------------------
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Temperatura Inverter"
+    register_type: read
+    address: 2328
+    value_type: S_WORD
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Temperatura DCDC"
+    register_type: read
+    address: 2329
+    value_type: S_WORD
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Temperatura Case"
+    register_type: read
+    address: 2330
+    value_type: S_WORD
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  # -------------------- ENERGIE RETE E CARICO (dall'inverter) --------------------
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Energia Giornaliera Rete Acquistata"
+    register_type: read
+    address: 2515
+    value_type: U_WORD
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Energia Totale Rete Acquistata"
+    register_type: read
+    address: 2520
+    value_type: U_DWORD
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Energia Giornaliera Rete Venduta"
+    register_type: read
+    address: 2522
+    value_type: U_WORD
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Energia Totale Rete Venduta"
+    register_type: read
+    address: 2527
+    value_type: U_DWORD
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Energia Giornaliera Carico"
+    register_type: read
+    address: 2529
+    value_type: U_WORD
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Energia Totale Carico"
+    register_type: read
+    address: 2534
+    value_type: U_DWORD
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+    # -------------------- ENERGIA RETE VENDUTA (mensile + annuale) --------------------
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Energia Mensile Rete Venduta"
+    register_type: read
+    address: 2523
+    value_type: U_DWORD
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Energia Annuale Rete Venduta"
+    register_type: read
+    address: 2525
+    value_type: U_DWORD
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+    # -------------------- ENERGIA RETE ACQUISTATA (mensile + annuale) --------------------
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Energia Mensile Rete Acquistata"
+    register_type: read
+    address: 2516
+    value_type: U_DWORD
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Energia Annuale Rete Acquistata"
+    register_type: read
+    address: 2518
+    value_type: U_DWORD
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  # -------------------- ENERGIA CARICO / CONSUMO (mensile + annuale) --------------------
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Energia Mensile Carico"
+    register_type: read
+    address: 2530
+    value_type: U_DWORD
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Energia Annuale Carico"
+    register_type: read
+    address: 2532
+    value_type: U_DWORD
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  # -------------------- STATI --------------------
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Stato Lavoro Sistema"
+    id: stato_lavoro
+    register_type: read
+    address: 2301
+    value_type: S_WORD
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Stato Inverter"
+    register_type: read
+    address: 2302
+    value_type: S_WORD
+
+# =========================================================
+# TEMPLATE (segni potenza + energie giornaliere)
+# =========================================================
+  # Rete - Prelievo (valori positivi)
+  - platform: template
+    name: "Potenza Prelievo Rete"
+    id: potenza_prelievo_rete
+    unit_of_measurement: "W"
+    device_class: power
+    state_class: measurement
+    lambda: |-
+      float v = id(potenza_attiva_rete).state;
+      return (isnan(v) || v <= 0) ? 0.0 : v;
+
+  # Rete - Immissione (valori negativi trasformati in positivi)
+  - platform: template
+    name: "Potenza Immissione Rete"
+    id: potenza_immissione_rete
+    unit_of_measurement: "W"
+    device_class: power
+    state_class: measurement
+    lambda: |-
+      float v = id(potenza_attiva_rete).state;
+      return (isnan(v) || v >= 0) ? 0.0 : -v;
+
+  # Batteria - Carica
+  - platform: template
+    name: "Potenza Carica Batteria"
+    id: potenza_carica_batt
+    unit_of_measurement: "W"
+    device_class: power
+    state_class: measurement
+    lambda: |-
+      float v = id(potenza_batteria).state;
+      return (isnan(v) || v <= 0) ? 0.0 : v;
+
+  # Batteria - Scarica
+  - platform: template
+    name: "Potenza Scarica Batteria"
+    id: potenza_scarica_batt
+    unit_of_measurement: "W"
+    device_class: power
+    state_class: measurement
+    lambda: |-
+      float v = id(potenza_batteria).state;
+      return (isnan(v) || v >= 0) ? 0.0 : -v;
+
+  # Energie giornaliere calcolate da Home Assistant
+  - platform: total_daily_energy
+    name: "Energia Solare Giornaliera"
+    power_id: potenza_totale_pv
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 3
+    filters:
+      - multiply: 0.001
+    restore: true
+
+  - platform: total_daily_energy
+    name: "Energia Casa Giornaliera"
+    power_id: potenza_carico
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 3
+    filters:
+      - multiply: 0.001
+    restore: true
+
+  - platform: total_daily_energy
+    name: "Energia Prelevata da Rete"
+    power_id: potenza_prelievo_rete
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 3
+    filters:
+      - multiply: 0.001
+    restore: true
+
+  - platform: total_daily_energy
+    name: "Energia Immessa in Rete"
+    power_id: potenza_immissione_rete
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 3
+    filters:
+      - multiply: 0.001
+    restore: true
+
+  - platform: total_daily_energy
+    name: "Energia Carica Batteria"
+    power_id: potenza_carica_batt
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 3
+    filters:
+      - multiply: 0.001
+    restore: true
+
+  - platform: total_daily_energy
+    name: "Energia Scarica Batteria"
+    power_id: potenza_scarica_batt
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 3
+    filters:
+      - multiply: 0.001
+    restore: true
+
+# =========================================================
+# SWITCH (scrittura)
+# =========================================================
+switch:
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Sorgente Carica: Rete + PV"
+    id: sorgente_carica_rete_pv
+    register_type: holding
+    address: 2955
+    write_lambda: |-
+      // 0 = Rete + PV | 1 = Solo PV
+      return x ? 0 : 1;
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Forza Carica Batteria"
+    id: forza_carica
+    register_type: holding
+    address: 2956
+    write_lambda: |-
+      // 1 = Carica forzata | 0 = Disattiva
+      return x ? 1 : 0;
+
+# =========================================================
+# NUMBER (scrittura)
+# =========================================================
+number:
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Potenza Carica Forzata"
+    id: potenza_carica_forzata
+    unit_of_measurement: "W"
+    address: 2957
+    register_type: holding
+    value_type: U_WORD
+    min_value: 100
+    max_value: 5000
+    step: 100
+    mode: box
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Limite Carica da Rete"
+    id: limite_carica_rete
+    unit_of_measurement: "W"
+    address: 2962
+    register_type: holding
+    value_type: U_WORD
+    min_value: 0
+    max_value: 5000
+    step: 100
+    mode: box
+
+# =========================================================
+# TEXT SENSOR (stati leggibili)
+# =========================================================
+text_sensor:
+  - platform: template
+    name: "Stato Sistema"
+    lambda: |-
+      int s = id(stato_lavoro).state;
+      if (s == 0) return {"Pragmatic"};
+      if (s == 1) return {"Avvio"};
+      if (s == 2) return {"In Rete"};
+      if (s == 3) return {"Fuori Rete"};
+      if (s == 4) return {"Guasto"};
+      if (s == 5) return {"PV Fuori Rete"};
+      if (s == 6) return {"Calibrazione Tensione"};
+      if (s == 7) return {"Autotest"};
+      return {"Sconosciuto"};
+    update_interval: 10s
+
+  
+# =========================================================
+# TIME + BINARY SENSOR
+# =========================================================
+time:
+  - platform: homeassistant
+    id: homeassistant_time
+
+binary_sensor:
+  - platform: status
+    name: "Stato ESP RS485"
