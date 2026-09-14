@@ -15,16 +15,9 @@ LIVE_REGISTER_BLOCKS: tuple[dict[str, int | str], ...] = (
     {"reg": 2100, "func": "04", "len": 3, "typ": "s16"},
     {"reg": 2112, "func": "04", "len": 3, "typ": "s16"},
     {"reg": 2124, "func": "04", "len": 6, "typ": "s16"},
+    {"reg": 2148, "func": "04", "len": 21, "typ": "u16"},
     {"reg": 2232, "func": "04", "len": 7, "typ": "u16"},
     {"reg": 2241, "func": "04", "len": 2, "typ": "u16"},
-    {"reg": 2328, "func": "04", "len": 3, "typ": "s16"},
-    {"reg": 2400, "func": "04", "len": 3, "typ": "s16"},
-    {"reg": 2403, "func": "04", "len": 12, "typ": "s16"},
-    {"reg": 2445, "func": "04", "len": 4, "typ": "s16"},
-    {"reg": 2941, "func": "04", "len": 29, "typ": "s16"},
-    {"reg": 3000, "func": "04", "len": 5, "typ": "u16"},
-    {"reg": 3005, "func": "04", "len": 1, "typ": "s16"},
-    {"reg": 3006, "func": "04", "len": 17, "typ": "u16"},
 )
 
 
