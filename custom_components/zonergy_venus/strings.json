@@ -36,7 +36,7 @@
           "password": "Zonergy app password",
           "username": "Zonergy app account"
         },
-        "description": "Use the same account as the official Zonergy app. This experimental mode only reads data and polls the cloud every 15 seconds.",
+        "description": "Use the same account as the official Zonergy app. This read-only mode checks the cloud every 60 seconds; Zonergy normally refreshes the source data every 4–5 minutes.",
         "title": "Connect to Zonergy Cloud"
       },
       "cloud_device": {
@@ -58,8 +58,7 @@
   },
   "entity": {
     "binary_sensor": {
-      "cloud_online": { "name": "Cloud connection" },
-      "cloud_realtime": { "name": "Real-time cloud endpoint" }
+      "cloud_online": { "name": "Cloud connection" }
     },
     "sensor": {
       "battery_current": { "name": "Battery current" },

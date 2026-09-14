@@ -11,14 +11,12 @@ CONF_DEVICE_SN: Final = "device_sn"
 CONF_INVERTER_MODEL: Final = "inverter_model"
 CONF_PLANT_ID: Final = "plant_id"
 CONF_PLANT_NAME: Final = "plant_name"
-CONF_REALTIME_DEVICE_ID: Final = "realtime_device_id"
 
 CONNECTION_ESPHOME: Final = "esphome"
 CONNECTION_CLOUD: Final = "cloud"
 
 CLOUD_BASE_URL: Final = "https://zonergy.vidagrid.com"
-CLOUD_SCAN_INTERVAL: Final = 15
-CLOUD_REALTIME_INTERVAL: Final = 60
+CLOUD_SCAN_INTERVAL: Final = 60
 
 PLATFORMS: Final = ["sensor", "binary_sensor", "switch", "number"]
 

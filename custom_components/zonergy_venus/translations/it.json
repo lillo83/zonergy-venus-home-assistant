@@ -36,7 +36,7 @@
           "password": "Password dell’app Zonergy",
           "username": "Account dell’app Zonergy"
         },
-        "description": "Usa lo stesso account dell’app ufficiale Zonergy. Questa modalità sperimentale legge soltanto i dati e interroga il cloud ogni 15 secondi.",
+        "description": "Usa lo stesso account dell’app ufficiale Zonergy. Questa modalità in sola lettura controlla il cloud ogni 60 secondi; Zonergy aggiorna normalmente i dati di origine ogni 4–5 minuti.",
         "title": "Collega Zonergy Cloud"
       },
       "cloud_device": {
@@ -58,8 +58,7 @@
   },
   "entity": {
     "binary_sensor": {
-      "cloud_online": { "name": "Connessione cloud" },
-      "cloud_realtime": { "name": "Endpoint cloud in tempo reale" }
+      "cloud_online": { "name": "Connessione cloud" }
     },
     "sensor": {
       "battery_current": { "name": "Corrente batteria" },

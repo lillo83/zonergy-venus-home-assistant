@@ -9,12 +9,10 @@ from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .cloud import ZonergyCloudCoordinator
-from .cloud_api import ZonergyCloudApi, ZonergyCloudError
+from .cloud_api import ZonergyCloudApi
 from .const import (
     CONF_CONNECTION_TYPE,
-    CONF_DEVICE_SN,
     CONF_ENCRYPTION_KEY,
-    CONF_REALTIME_DEVICE_ID,
     CONNECTION_CLOUD,
     CONNECTION_ESPHOME,
     PLATFORMS,
@@ -39,27 +37,6 @@ async def async_setup_entry(
             account=entry.data[CONF_USERNAME],
             password=entry.data[CONF_PASSWORD],
         )
-        if CONF_REALTIME_DEVICE_ID not in entry.data:
-            try:
-                devices = await api.async_discover_devices()
-            except ZonergyCloudError:
-                devices = []
-            device = next(
-                (
-                    item
-                    for item in devices
-                    if item.serial_number == entry.data.get(CONF_DEVICE_SN)
-                ),
-                None,
-            )
-            if device is not None:
-                hass.config_entries.async_update_entry(
-                    entry,
-                    data={
-                        **entry.data,
-                        CONF_REALTIME_DEVICE_ID: device.realtime_id,
-                    },
-                )
         coordinator = ZonergyCloudCoordinator(hass, entry, api)
         await coordinator.async_config_entry_first_refresh()
         entry.runtime_data = coordinator

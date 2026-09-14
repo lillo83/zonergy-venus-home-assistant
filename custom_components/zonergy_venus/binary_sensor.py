@@ -24,9 +24,7 @@ async def async_setup_entry(
     """Set up binary sensors discovered through ESPHome."""
     manager = entry.runtime_data
     if isinstance(manager, ZonergyCloudCoordinator):
-        async_add_entities(
-            [ZonergyCloudOnlineSensor(manager), ZonergyCloudRealtimeSensor(manager)]
-        )
+        async_add_entities([ZonergyCloudOnlineSensor(manager)])
         return
 
     async_add_entities(
@@ -76,27 +74,6 @@ class ZonergyCloudOnlineSensor(ZonergyCloudEntity, BinarySensorEntity):
         if isinstance(value, str):
             return value.lower() in {"1", "2", "true", "online", "normal", "fault"}
         return bool(value)
-
-    @property
-    def native_cloud_value(self) -> bool | None:
-        """Expose the resolved value to the common availability check."""
-        return self.is_on
-
-
-class ZonergyCloudRealtimeSensor(ZonergyCloudEntity, BinarySensorEntity):
-    """Whether the optional real-time cloud endpoint is responding."""
-
-    _attr_translation_key = "cloud_realtime"
-    _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
-
-    def __init__(self, coordinator: ZonergyCloudCoordinator) -> None:
-        super().__init__(coordinator, "_realtime_available")
-
-    @property
-    def is_on(self) -> bool | None:
-        """Return whether a real-time response was received."""
-        value = self.coordinator.data.get("_realtime_available")
-        return value if isinstance(value, bool) else None
 
     @property
     def native_cloud_value(self) -> bool | None:
