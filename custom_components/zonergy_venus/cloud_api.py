@@ -7,7 +7,13 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from aiohttp import ClientError, ClientResponse, ClientSession, ClientTimeout
+from aiohttp import (
+    ClientError,
+    ClientResponse,
+    ClientResponseError,
+    ClientSession,
+    ClientTimeout,
+)
 
 from .const import CLOUD_BASE_URL
 
@@ -278,8 +284,12 @@ class ZonergyCloudApi:
                     )
                 response.raise_for_status()
                 payload = await response.json(content_type=None)
+        except ClientResponseError as err:
+            detail = err.message or "request rejected"
+            raise ZonergyCloudConnectionError(f"HTTP {err.status} {detail}") from err
         except (ClientError, TimeoutError, ValueError) as err:
-            raise ZonergyCloudConnectionError from err
+            detail = str(err) or type(err).__name__
+            raise ZonergyCloudConnectionError(detail) from err
 
         if not isinstance(payload, dict):
             raise ZonergyCloudConnectionError("Invalid response from Zonergy")

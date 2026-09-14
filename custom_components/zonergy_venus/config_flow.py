@@ -15,6 +15,7 @@ from aioesphomeapi import (
 from aioesphomeapi.model import DeviceInfo, EntityInfo
 from homeassistant import config_entries
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_PORT, CONF_USERNAME
+from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers import selector
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -88,6 +89,14 @@ class ZonergyVenusConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._cloud_credentials: dict[str, str] = {}
         self._cloud_devices: dict[str, ZonergyCloudDevice] = {}
         self._reauth_entry: config_entries.ConfigEntry | None = None
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(
+        config_entry: config_entries.ConfigEntry,
+    ) -> ZonergyVenusOptionsFlow:
+        """Return the cloud options flow."""
+        return ZonergyVenusOptionsFlow()
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -306,4 +315,30 @@ class ZonergyVenusConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         }
         return self.async_create_entry(
             title=f"{device.plant_name} — {device.model}", data=data
+        )
+
+
+class ZonergyVenusOptionsFlow(config_entries.OptionsFlow):
+    """Configure optional cloud register access."""
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Set the original Wi-Fi dongle serial number."""
+        if user_input is not None:
+            return self.async_create_entry(data=user_input)
+
+        current = self.config_entry.options.get(
+            CONF_REGISTER_DEVICE_ID,
+            self.config_entry.data.get(CONF_REGISTER_DEVICE_ID, ""),
+        )
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_REGISTER_DEVICE_ID, default=current
+                    ): selector.TextSelector()
+                }
+            ),
         )
