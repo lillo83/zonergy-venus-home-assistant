@@ -26,6 +26,15 @@ LIVE_REGISTER_BLOCKS: tuple[dict[str, int | str], ...] = (
     {"reg": 2241, "func": "04", "len": 2, "typ": "u16"},
 )
 
+LIVE_REGISTER_ENDPOINTS: tuple[tuple[str | None, str], ...] = (
+    (None, "/web/param/readDeviceData"),
+    (None, "/ds/web/param/readDeviceData"),
+    (None, "/dsweb/param/readDeviceData"),
+    ("https://iot.vidagrid.com", "/web/param/readDeviceData"),
+    ("https://iot.vidagrid.com", "/ds/web/param/readDeviceData"),
+    ("https://iot.vidagrid.com", "/dsweb/param/readDeviceData"),
+)
+
 
 class ZonergyCloudError(Exception):
     """Base error raised by the Zonergy cloud client."""
@@ -70,6 +79,8 @@ class ZonergyCloudApi:
         self._auth: str | None = None
         self._cookies: dict[str, str] = {}
         self._working_register_device_id: str | None = None
+        self._working_register_endpoint: tuple[str | None, str] | None = None
+        self._missing_register_endpoints: set[tuple[str | None, str]] = set()
 
     async def async_login(self) -> None:
         """Authenticate using the same renewal flow as the official app."""
@@ -226,19 +237,44 @@ class ZonergyCloudApi:
         self, device_id: str
     ) -> tuple[dict[str, Any], str]:
         """Read live inverter registers through the dongle's cloud bridge."""
-        response = await self._request(
-            "POST",
-            "/dsweb/param/readDeviceData",
-            json={"did": device_id, "data": list(LIVE_REGISTER_BLOCKS)},
+        candidates = [self._working_register_endpoint, *LIVE_REGISTER_ENDPOINTS]
+        endpoints = list(
+            dict.fromkeys(
+                endpoint
+                for endpoint in candidates
+                if endpoint is not None
+                and endpoint not in self._missing_register_endpoints
+            )
         )
-        data = response.get("data")
-        registers = _normalise_register_data(data)
-        values = _live_values(registers)
-        diagnostic = (
-            "No supported registers in "
-            f"{type(data).__name__} response ({len(registers)} decoded values)"
-        )
-        return values, diagnostic
+        errors: list[str] = []
+        for base_url, path in endpoints:
+            label = f"{base_url or self._base_url}{path}"
+            try:
+                response = await self._request(
+                    "POST",
+                    path,
+                    request_base_url=base_url,
+                    json={"did": device_id, "data": list(LIVE_REGISTER_BLOCKS)},
+                )
+            except ZonergyCloudError as err:
+                errors.append(f"{label}: {err}")
+                if str(err).startswith("HTTP 404"):
+                    self._missing_register_endpoints.add((base_url, path))
+                continue
+
+            data = response.get("data")
+            registers = _normalise_register_data(data)
+            values = _live_values(registers)
+            if values:
+                self._working_register_endpoint = (base_url, path)
+                return values, ""
+            errors.append(
+                f"{label}: no supported registers in "
+                f"{type(data).__name__} response ({len(registers)} decoded values)"
+            )
+
+        detail = " | ".join(errors) or "No register endpoint remains available"
+        raise ZonergyCloudConnectionError(detail)
 
     async def _request(
         self,
@@ -247,6 +283,7 @@ class ZonergyCloudApi:
         *,
         authenticated: bool = True,
         retry_auth: bool = True,
+        request_base_url: str | None = None,
         **kwargs: Any,
     ) -> dict[str, Any]:
         if authenticated and self._auth is None:
@@ -264,7 +301,7 @@ class ZonergyCloudApi:
             response: ClientResponse
             async with self._session.request(
                 method,
-                f"{self._base_url}{path}",
+                f"{request_base_url or self._base_url}{path}",
                 headers=headers,
                 timeout=ClientTimeout(total=30),
                 **kwargs,
@@ -280,6 +317,7 @@ class ZonergyCloudApi:
                         path,
                         authenticated=True,
                         retry_auth=False,
+                        request_base_url=request_base_url,
                         **kwargs,
                     )
                 response.raise_for_status()
