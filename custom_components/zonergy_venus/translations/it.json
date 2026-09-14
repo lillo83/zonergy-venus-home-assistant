@@ -1,15 +1,27 @@
 {
   "config": {
     "abort": {
-      "already_configured": "Questo gateway Zonergy è già configurato"
+      "already_configured": "Questo dispositivo Zonergy è già configurato",
+      "reauth_successful": "Credenziali Zonergy Cloud aggiornate"
     },
     "error": {
       "cannot_connect": "Impossibile collegarsi al gateway ESPHome",
+      "cannot_connect_cloud": "Impossibile collegarsi a Zonergy Cloud",
+      "cloud_device_missing": "L’inverter configurato in precedenza non è disponibile in questo account",
       "invalid_auth": "Password API o chiave di crittografia non valida",
-      "invalid_gateway": "Il nodo ESPHome non contiene le entità previste per Zonergy Venus"
+      "invalid_cloud_auth": "Account o password di Zonergy Cloud non validi",
+      "invalid_gateway": "Il nodo ESPHome non contiene le entità previste per Zonergy Venus",
+      "no_cloud_devices": "Nessun inverter trovato in questo account Zonergy Cloud"
     },
     "step": {
       "user": {
+        "menu_options": {
+          "cloud": "Zonergy Cloud (dongle Wi-Fi originale)",
+          "esphome": "Gateway RS485 ESPHome"
+        },
+        "title": "Scegli il tipo di collegamento"
+      },
+      "esphome": {
         "data": {
           "encryption_key": "Chiave di crittografia API ESPHome (facoltativa)",
           "host": "Indirizzo IP o nome host dell’ESP8266",
@@ -17,8 +29,58 @@
           "port": "Porta API ESPHome"
         },
         "description": "Inserisci i dati di rete dell’ESP8266 collegato tramite RS485 all’inverter Zonergy Venus.",
-        "title": "Collega il gateway Zonergy Venus"
+        "title": "Collega il gateway ESPHome"
+      },
+      "cloud": {
+        "data": {
+          "password": "Password dell’app Zonergy",
+          "username": "Account dell’app Zonergy"
+        },
+        "description": "Usa lo stesso account dell’app ufficiale Zonergy. Questa modalità sperimentale legge soltanto i dati e si aggiorna ogni 30 secondi.",
+        "title": "Collega Zonergy Cloud"
+      },
+      "cloud_device": {
+        "data": {
+          "device_id": "Inverter"
+        },
+        "description": "Scegli l’inverter da aggiungere. Per aggiungerne un altro, avvia nuovamente la configurazione.",
+        "title": "Scegli un inverter"
+      },
+      "reauth_confirm": {
+        "data": {
+          "password": "Password dell’app Zonergy",
+          "username": "Account dell’app Zonergy"
+        },
+        "description": "Inserisci le credenziali attuali dell’account Zonergy associato a questo inverter.",
+        "title": "Ricollega Zonergy Cloud"
       }
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "cloud_online": { "name": "Connessione cloud" }
+    },
+    "sensor": {
+      "battery_current": { "name": "Corrente batteria" },
+      "battery_power": { "name": "Potenza batteria" },
+      "battery_soc": { "name": "Stato di carica batteria" },
+      "battery_voltage": { "name": "Tensione batteria" },
+      "grid_current": { "name": "Corrente rete" },
+      "grid_frequency": { "name": "Frequenza rete" },
+      "grid_power": { "name": "Potenza rete" },
+      "grid_voltage": { "name": "Tensione rete" },
+      "inverter_temperature": { "name": "Temperatura inverter" },
+      "load_power": { "name": "Potenza carico" },
+      "month_generation": { "name": "Energia prodotta questo mese" },
+      "pv1_current": { "name": "Corrente PV1" },
+      "pv1_power": { "name": "Potenza PV1" },
+      "pv1_voltage": { "name": "Tensione PV1" },
+      "pv2_current": { "name": "Corrente PV2" },
+      "pv2_power": { "name": "Potenza PV2" },
+      "pv2_voltage": { "name": "Tensione PV2" },
+      "pv_power": { "name": "Potenza fotovoltaico" },
+      "today_generation": { "name": "Energia prodotta oggi" },
+      "total_generation": { "name": "Energia totale prodotta" }
     }
   }
 }
