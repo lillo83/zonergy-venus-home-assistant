@@ -1,0 +1,30 @@
+name: Release v0.2.0-beta.1
+
+on:
+  push:
+    branches: [feature/zonergy-cloud-read-only]
+    paths:
+      - ".github/workflows/release-v0.2.0-beta.1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create beta release if missing
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view v0.2.0-beta.1 --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            echo "Release v0.2.0-beta.1 already exists"
+            exit 0
+          fi
+          gh release create v0.2.0-beta.1 \
+            --repo "${GITHUB_REPOSITORY}" \
+            --target "${GITHUB_SHA}" \
+            --prerelease \
+            --title "Zonergy Venus v0.2.0-beta.1" \
+            --notes "Experimental read-only Zonergy Cloud mode for real-device testing. The existing ESPHome/RS485 mode remains available."

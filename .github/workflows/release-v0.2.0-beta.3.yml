@@ -1,0 +1,30 @@
+name: Release v0.2.0-beta.3
+
+on:
+  push:
+    branches: [feature/zonergy-cloud-read-only]
+    paths:
+      - ".github/workflows/release-v0.2.0-beta.3.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create beta release if missing
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view v0.2.0-beta.3 --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            echo "Release v0.2.0-beta.3 already exists"
+            exit 0
+          fi
+          gh release create v0.2.0-beta.3 \
+            --repo "${GITHUB_REPOSITORY}" \
+            --target "${GITHUB_SHA}" \
+            --prerelease \
+            --title "Zonergy Venus v0.2.0-beta.3" \
+            --notes "Adds the extended read-only cloud sensor set, creating only measurements returned by the configured inverter."
