@@ -32,7 +32,6 @@ class ZonergyCloudSensorDescription(SensorEntityDescription):
     """Describe a numeric value returned by Zonergy cloud."""
 
     value_keys: tuple[str, ...]
-    scale: float = 1
 
 
 CLOUD_SENSORS: tuple[ZonergyCloudSensorDescription, ...] = (
@@ -183,7 +182,6 @@ CLOUD_SENSORS: tuple[ZonergyCloudSensorDescription, ...] = (
         native_unit_of_measurement="kWh",
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL_INCREASING,
-        scale=0.001,
     ),
     ZonergyCloudSensorDescription(
         key="month_generation",
@@ -192,7 +190,6 @@ CLOUD_SENSORS: tuple[ZonergyCloudSensorDescription, ...] = (
         native_unit_of_measurement="kWh",
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL_INCREASING,
-        scale=0.001,
     ),
     ZonergyCloudSensorDescription(
         key="total_generation",
@@ -201,7 +198,6 @@ CLOUD_SENSORS: tuple[ZonergyCloudSensorDescription, ...] = (
         native_unit_of_measurement="kWh",
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL_INCREASING,
-        scale=0.001,
     ),
 )
 
@@ -288,14 +284,14 @@ class ZonergyCloudSensor(ZonergyCloudEntity, SensorEntity):
             if isinstance(value, bool):
                 continue
             if isinstance(value, (int, float)) and math.isfinite(value):
-                return value * self.entity_description.scale
+                return value
             if isinstance(value, str):
                 try:
                     numeric = float(value)
                 except ValueError:
                     continue
                 if math.isfinite(numeric):
-                    return numeric * self.entity_description.scale
+                    return numeric
         return None
 
     @property
