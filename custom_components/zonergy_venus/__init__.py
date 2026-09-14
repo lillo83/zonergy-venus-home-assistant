@@ -6,17 +6,18 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_PORT, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .cloud import ZonergyCloudCoordinator
-from .cloud_api import ZonergyCloudApi, ZonergyCloudError
+from .cloud_api import ZonergyCloudApi
 from .const import (
     CONF_CONNECTION_TYPE,
     CONF_DEVICE_SN,
     CONF_ENCRYPTION_KEY,
-    CONF_REGISTER_DEVICE_ID,
     CONNECTION_CLOUD,
     CONNECTION_ESPHOME,
+    DOMAIN,
     PLATFORMS,
 )
 from .manager import ZonergyVenusManager
@@ -34,12 +35,20 @@ async def async_setup_entry(
         CONNECTION_ESPHOME if CONF_HOST in entry.data else CONNECTION_CLOUD,
     )
     if connection_type == CONNECTION_CLOUD:
+        registry = er.async_get(hass)
+        serial = entry.data[CONF_DEVICE_SN]
+        for old_key in ("_register_read_available", "_realtime_available"):
+            unique_id = f"{serial}_cloud_{old_key}"
+            if entity_id := registry.async_get_entity_id(
+                "binary_sensor", DOMAIN, unique_id
+            ):
+                registry.async_remove(entity_id)
+
         api = ZonergyCloudApi(
             async_get_clientsession(hass),
             account=entry.data[CONF_USERNAME],
             password=entry.data[CONF_PASSWORD],
         )
-        await _async_migrate_register_device_id(hass, entry, api)
         coordinator = ZonergyCloudCoordinator(hass, entry, api)
         await coordinator.async_config_entry_first_refresh()
         entry.runtime_data = coordinator
@@ -67,42 +76,6 @@ async def async_setup_entry(
     entry.runtime_data = manager
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
-
-
-async def _async_migrate_register_device_id(
-    hass: HomeAssistant,
-    entry: ZonergyVenusConfigEntry,
-    api: ZonergyCloudApi,
-) -> None:
-    """Store the collector identifier required by the live register endpoint."""
-    if entry.data.get(CONF_REGISTER_DEVICE_ID):
-        return
-
-    legacy_id = entry.data.get("realtime_device_id")
-    if legacy_id:
-        hass.config_entries.async_update_entry(
-            entry, data={**entry.data, CONF_REGISTER_DEVICE_ID: legacy_id}
-        )
-        return
-
-    try:
-        devices = await api.async_discover_devices()
-    except ZonergyCloudError:
-        return
-
-    serial = entry.data.get(CONF_DEVICE_SN)
-    device = next(
-        (item for item in devices if item.serial_number == serial),
-        None,
-    )
-    if device is not None:
-        hass.config_entries.async_update_entry(
-            entry,
-            data={
-                **entry.data,
-                CONF_REGISTER_DEVICE_ID: device.register_device_id,
-            },
-        )
 
 
 async def async_unload_entry(

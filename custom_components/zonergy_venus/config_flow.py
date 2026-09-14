@@ -15,7 +15,6 @@ from aioesphomeapi import (
 from aioesphomeapi.model import DeviceInfo, EntityInfo
 from homeassistant import config_entries
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_PORT, CONF_USERNAME
-from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers import selector
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -35,7 +34,6 @@ from .const import (
     CONF_INVERTER_MODEL,
     CONF_PLANT_ID,
     CONF_PLANT_NAME,
-    CONF_REGISTER_DEVICE_ID,
     CONNECTION_CLOUD,
     CONNECTION_ESPHOME,
     DEFAULT_PORT,
@@ -89,14 +87,6 @@ class ZonergyVenusConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._cloud_credentials: dict[str, str] = {}
         self._cloud_devices: dict[str, ZonergyCloudDevice] = {}
         self._reauth_entry: config_entries.ConfigEntry | None = None
-
-    @staticmethod
-    @callback
-    def async_get_options_flow(
-        config_entry: config_entries.ConfigEntry,
-    ) -> ZonergyVenusOptionsFlow:
-        """Return the cloud options flow."""
-        return ZonergyVenusOptionsFlow()
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -276,7 +266,6 @@ class ZonergyVenusConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                             CONF_PLANT_NAME: device.plant_name,
                             CONF_DEVICE_ID: device.device_id,
                             CONF_INVERTER_MODEL: device.model,
-                            CONF_REGISTER_DEVICE_ID: device.register_device_id,
                         },
                         reason="reauth_successful",
                     )
@@ -311,34 +300,7 @@ class ZonergyVenusConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             CONF_DEVICE_ID: device.device_id,
             CONF_DEVICE_SN: device.serial_number,
             CONF_INVERTER_MODEL: device.model,
-            CONF_REGISTER_DEVICE_ID: device.register_device_id,
         }
         return self.async_create_entry(
             title=f"{device.plant_name} — {device.model}", data=data
-        )
-
-
-class ZonergyVenusOptionsFlow(config_entries.OptionsFlow):
-    """Configure optional cloud register access."""
-
-    async def async_step_init(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """Set the original Wi-Fi dongle serial number."""
-        if user_input is not None:
-            return self.async_create_entry(data=user_input)
-
-        current = self.config_entry.options.get(
-            CONF_REGISTER_DEVICE_ID,
-            self.config_entry.data.get(CONF_REGISTER_DEVICE_ID, ""),
-        )
-        return self.async_show_form(
-            step_id="init",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(
-                        CONF_REGISTER_DEVICE_ID, default=current
-                    ): selector.TextSelector()
-                }
-            ),
         )

@@ -7,33 +7,9 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from aiohttp import (
-    ClientError,
-    ClientResponse,
-    ClientResponseError,
-    ClientSession,
-    ClientTimeout,
-)
+from aiohttp import ClientError, ClientResponse, ClientSession, ClientTimeout
 
 from .const import CLOUD_BASE_URL
-
-LIVE_REGISTER_BLOCKS: tuple[dict[str, int | str], ...] = (
-    {"reg": 2100, "func": "04", "len": 3, "typ": "s16"},
-    {"reg": 2112, "func": "04", "len": 3, "typ": "s16"},
-    {"reg": 2124, "func": "04", "len": 6, "typ": "s16"},
-    {"reg": 2148, "func": "04", "len": 21, "typ": "u16"},
-    {"reg": 2232, "func": "04", "len": 7, "typ": "u16"},
-    {"reg": 2241, "func": "04", "len": 2, "typ": "u16"},
-)
-
-LIVE_REGISTER_ENDPOINTS: tuple[tuple[str | None, str], ...] = (
-    (None, "/web/param/readDeviceData"),
-    (None, "/ds/web/param/readDeviceData"),
-    (None, "/dsweb/param/readDeviceData"),
-    ("https://iot.vidagrid.com", "/web/param/readDeviceData"),
-    ("https://iot.vidagrid.com", "/ds/web/param/readDeviceData"),
-    ("https://iot.vidagrid.com", "/dsweb/param/readDeviceData"),
-)
 
 
 class ZonergyCloudError(Exception):
@@ -57,7 +33,6 @@ class ZonergyCloudDevice:
     device_id: str
     serial_number: str
     model: str
-    register_device_id: str
     raw: dict[str, Any]
 
 
@@ -78,9 +53,6 @@ class ZonergyCloudApi:
         self._base_url = base_url.rstrip("/")
         self._auth: str | None = None
         self._cookies: dict[str, str] = {}
-        self._working_register_device_id: str | None = None
-        self._working_register_endpoint: tuple[str | None, str] | None = None
-        self._missing_register_endpoints: set[tuple[str | None, str]] = set()
 
     async def async_login(self) -> None:
         """Authenticate using the same renewal flow as the official app."""
@@ -159,9 +131,6 @@ class ZonergyCloudApi:
                     continue
                 serial = _first_text(row, "inverter_sn", "sn", "device_sn")
                 model = _first_text(row, "inverter_model", "model")
-                register_device_id = _first_text(
-                    row, "device_id", "collector_sn", "collectorSn"
-                )
                 devices.append(
                     ZonergyCloudDevice(
                         plant_id=plant_id,
@@ -169,18 +138,13 @@ class ZonergyCloudApi:
                         device_id=device_id,
                         serial_number=serial or device_id,
                         model=model or "Venus",
-                        register_device_id=register_device_id or serial or device_id,
                         raw=row,
                     )
                 )
         return devices
 
     async def async_device_data(
-        self,
-        *,
-        plant_id: str,
-        device_id: str,
-        register_device_id: str | None = None,
+        self, *, plant_id: str, device_id: str
     ) -> dict[str, Any]:
         """Read the current inverter and plant dashboards."""
         device = await self._request(
@@ -198,83 +162,7 @@ class ZonergyCloudApi:
         result = dict(plant_data) if isinstance(plant_data, dict) else {}
         if isinstance(device_data, dict):
             result.update(device_data)
-        candidates = [
-            self._working_register_device_id,
-            register_device_id,
-            _first_text(device_data, "device_id", "collector_sn", "collectorSn")
-            if isinstance(device_data, dict)
-            else None,
-            device_id,
-            _first_text(result, "inverter_sn", "sn", "device_sn"),
-        ]
-        register_ids = list(dict.fromkeys(value for value in candidates if value))
-        live_data: dict[str, Any] = {}
-        register_error = "No register identifier is available"
-        used_register_id = register_ids[0] if register_ids else ""
-        errors: list[str] = []
-        for candidate in register_ids:
-            try:
-                live_data, diagnostic = await self._async_read_live_registers(candidate)
-            except ZonergyCloudError as err:
-                errors.append(f"{candidate}: {err}")
-                continue
-            if live_data:
-                self._working_register_device_id = candidate
-                used_register_id = candidate
-                register_error = ""
-                break
-            errors.append(f"{candidate}: {diagnostic}")
-        else:
-            if errors:
-                register_error = "; ".join(errors)
-        result.update(live_data)
-        result["_register_read_available"] = bool(live_data)
-        result["_register_device_id"] = used_register_id
-        result["_register_read_error"] = register_error
         return result
-
-    async def _async_read_live_registers(
-        self, device_id: str
-    ) -> tuple[dict[str, Any], str]:
-        """Read live inverter registers through the dongle's cloud bridge."""
-        candidates = [self._working_register_endpoint, *LIVE_REGISTER_ENDPOINTS]
-        endpoints = list(
-            dict.fromkeys(
-                endpoint
-                for endpoint in candidates
-                if endpoint is not None
-                and endpoint not in self._missing_register_endpoints
-            )
-        )
-        errors: list[str] = []
-        for base_url, path in endpoints:
-            label = f"{base_url or self._base_url}{path}"
-            try:
-                response = await self._request(
-                    "POST",
-                    path,
-                    request_base_url=base_url,
-                    json={"did": device_id, "data": list(LIVE_REGISTER_BLOCKS)},
-                )
-            except ZonergyCloudError as err:
-                errors.append(f"{label}: {err}")
-                if str(err).startswith("HTTP 404"):
-                    self._missing_register_endpoints.add((base_url, path))
-                continue
-
-            data = response.get("data")
-            registers = _normalise_register_data(data)
-            values = _live_values(registers)
-            if values:
-                self._working_register_endpoint = (base_url, path)
-                return values, ""
-            errors.append(
-                f"{label}: no supported registers in "
-                f"{type(data).__name__} response ({len(registers)} decoded values)"
-            )
-
-        detail = " | ".join(errors) or "No register endpoint remains available"
-        raise ZonergyCloudConnectionError(detail)
 
     async def _request(
         self,
@@ -283,7 +171,6 @@ class ZonergyCloudApi:
         *,
         authenticated: bool = True,
         retry_auth: bool = True,
-        request_base_url: str | None = None,
         **kwargs: Any,
     ) -> dict[str, Any]:
         if authenticated and self._auth is None:
@@ -301,7 +188,7 @@ class ZonergyCloudApi:
             response: ClientResponse
             async with self._session.request(
                 method,
-                f"{request_base_url or self._base_url}{path}",
+                f"{self._base_url}{path}",
                 headers=headers,
                 timeout=ClientTimeout(total=30),
                 **kwargs,
@@ -317,17 +204,12 @@ class ZonergyCloudApi:
                         path,
                         authenticated=True,
                         retry_auth=False,
-                        request_base_url=request_base_url,
                         **kwargs,
                     )
                 response.raise_for_status()
                 payload = await response.json(content_type=None)
-        except ClientResponseError as err:
-            detail = err.message or "request rejected"
-            raise ZonergyCloudConnectionError(f"HTTP {err.status} {detail}") from err
         except (ClientError, TimeoutError, ValueError) as err:
-            detail = str(err) or type(err).__name__
-            raise ZonergyCloudConnectionError(detail) from err
+            raise ZonergyCloudConnectionError from err
 
         if not isinstance(payload, dict):
             raise ZonergyCloudConnectionError("Invalid response from Zonergy")
@@ -346,109 +228,3 @@ def _first_text(data: dict[str, Any], *keys: str) -> str:
         if value is not None and value != "":
             return str(value)
     return ""
-
-
-def _live_values(registers: dict[str, Any]) -> dict[str, Any]:
-    """Convert the Venus live register response to dashboard field names."""
-
-    def raw(address: int) -> int | None:
-        value = registers.get(str(address), registers.get(address))
-        try:
-            return int(value) if value is not None else None
-        except (TypeError, ValueError):
-            return None
-
-    def s16(address: int) -> int | None:
-        value = raw(address)
-        if value is None:
-            return None
-        value &= 0xFFFF
-        return value - 0x10000 if value & 0x8000 else value
-
-    def dword(address: int, *, signed: bool) -> int | None:
-        high = raw(address)
-        low = raw(address + 1)
-        if high is None or low is None:
-            return None
-        value = ((high & 0xFFFF) << 16) | (low & 0xFFFF)
-        if signed and value & 0x80000000:
-            value -= 0x100000000
-        return value
-
-    values: dict[str, Any] = {}
-
-    def put(key: str, value: Any) -> None:
-        if value is not None:
-            values[key] = value
-
-    put("pv1_input_voltage", _scaled(s16(2100), 0.1))
-    put("pv2_input_voltage", _scaled(s16(2101), 0.1))
-    put("pv1_input_current", _scaled(s16(2112), 0.01))
-    put("pv2_input_current", _scaled(s16(2113), 0.01))
-    put("pv1_input_power", dword(2124, signed=True))
-    put("pv2_input_power", dword(2126, signed=True))
-    put("pv_input_power", dword(2241, signed=False))
-    put("today_generation", _scaled(raw(2232), 0.1))
-    put("month_generation", _scaled(dword(2233, signed=False), 0.1))
-    put("year_generation", _scaled(dword(2235, signed=False), 0.1))
-    put("total_generation", _scaled(dword(2237, signed=False), 0.1))
-    put("inverter_rad_temp", _scaled(s16(2328), 0.1))
-    put("dcdc_rad_temp", _scaled(s16(2329), 0.1))
-    put("internal_temp", _scaled(s16(2330), 0.1))
-    put("r_grid_voltage", _scaled(s16(2400), 0.1))
-    put("r_grid_current", _scaled(s16(2401), 0.01))
-    put("r_grid_freq", _scaled(s16(2402), 0.01))
-    put("r_active_power", dword(2403, signed=True))
-    put("r_load_voltage", _scaled(s16(2445), 0.1))
-    put("r_load_current", _scaled(s16(2446), 0.01))
-    put("r_load_power", dword(2447, signed=True))
-    put("inverter_battery_voltage", _scaled(s16(2967), 0.1))
-    put("inverter_battery_current", _scaled(s16(2968), 0.01))
-    put("inverter_battery_cd_power", s16(2969))
-    put("battery_avg_voltage", _scaled(raw(3004), 0.01))
-    put("battery_current", _scaled(s16(3005), 0.01))
-    put("battery_soc", raw(3006))
-    return values
-
-
-def _normalise_register_data(data: Any) -> dict[str, Any]:
-    """Flatten the register response formats used by different portal builds."""
-    registers: dict[str, Any] = {}
-
-    def visit(value: Any) -> None:
-        if isinstance(value, list):
-            for item in value:
-                visit(item)
-            return
-        if not isinstance(value, dict):
-            return
-
-        for key, item in value.items():
-            if str(key).isdigit() and not isinstance(item, (dict, list)):
-                registers[str(key)] = item
-
-        address = value.get("reg", value.get("address", value.get("start")))
-        values = value.get("data", value.get("values", value.get("value")))
-        try:
-            start = int(address) if address is not None else None
-        except (TypeError, ValueError):
-            start = None
-        if start is not None and isinstance(values, list):
-            for offset, item in enumerate(values):
-                if not isinstance(item, (dict, list)):
-                    registers[str(start + offset)] = item
-        elif start is not None and not isinstance(values, (dict, list)):
-            registers[str(start)] = values
-
-        for key in ("data", "values", "registers", "list", "rows"):
-            nested = value.get(key)
-            if isinstance(nested, (dict, list)):
-                visit(nested)
-
-    visit(data)
-    return registers
-
-
-def _scaled(value: int | None, factor: float) -> float | None:
-    """Scale a register value while preserving missing data."""
-    return round(value * factor, 3) if value is not None else None

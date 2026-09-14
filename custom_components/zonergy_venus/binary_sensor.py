@@ -24,9 +24,7 @@ async def async_setup_entry(
     """Set up binary sensors discovered through ESPHome."""
     manager = entry.runtime_data
     if isinstance(manager, ZonergyCloudCoordinator):
-        async_add_entities(
-            [ZonergyCloudOnlineSensor(manager), ZonergyCloudRegisterSensor(manager)]
-        )
+        async_add_entities([ZonergyCloudOnlineSensor(manager)])
         return
 
     async_add_entities(
@@ -81,37 +79,3 @@ class ZonergyCloudOnlineSensor(ZonergyCloudEntity, BinarySensorEntity):
     def native_cloud_value(self) -> bool | None:
         """Expose the resolved value to the common availability check."""
         return self.is_on
-
-
-class ZonergyCloudRegisterSensor(ZonergyCloudEntity, BinarySensorEntity):
-    """Whether live read-only register access is responding."""
-
-    _attr_translation_key = "cloud_register_read"
-    _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
-
-    def __init__(self, coordinator: ZonergyCloudCoordinator) -> None:
-        super().__init__(coordinator, "_register_read_available")
-
-    @property
-    def is_on(self) -> bool | None:
-        """Return whether live registers were received."""
-        value = self.coordinator.data.get("_register_read_available")
-        return value if isinstance(value, bool) else None
-
-    @property
-    def native_cloud_value(self) -> bool | None:
-        """Expose the resolved value to the common availability check."""
-        return self.is_on
-
-    @property
-    def extra_state_attributes(self) -> dict[str, str]:
-        """Expose register diagnostics without logging account credentials."""
-        attributes = {
-            "identificativo_usato": str(
-                self.coordinator.data.get("_register_device_id", "")
-            )
-        }
-        error = self.coordinator.data.get("_register_read_error")
-        if error:
-            attributes["ultimo_errore"] = str(error)
-        return attributes

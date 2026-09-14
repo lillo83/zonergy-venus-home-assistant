@@ -437,7 +437,6 @@ async def async_setup_entry(
         async_add_entities(
             ZonergyCloudSensor(manager, description)
             for description in CLOUD_SENSORS
-            if any(key in manager.data for key in description.value_keys)
         )
         return
 

@@ -56,21 +56,9 @@
       }
     }
   },
-  "options": {
-    "step": {
-      "init": {
-        "data": {
-          "register_device_id": "Original Wi-Fi dongle serial number"
-        },
-        "description": "Enter the collector serial shown as Collector SN in the Zonergy app (for example VD0600...). This is used only for read-only live register requests.",
-        "title": "Configure live register access"
-      }
-    }
-  },
   "entity": {
     "binary_sensor": {
-      "cloud_online": { "name": "Cloud connection" },
-      "cloud_register_read": { "name": "Live register connection" }
+      "cloud_online": { "name": "Cloud connection" }
     },
     "sensor": {
       "battery_current": { "name": "Battery current" },

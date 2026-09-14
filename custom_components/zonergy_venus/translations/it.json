@@ -56,21 +56,9 @@
       }
     }
   },
-  "options": {
-    "step": {
-      "init": {
-        "data": {
-          "register_device_id": "Numero di serie del dongle Wi-Fi originale"
-        },
-        "description": "Inserisci il numero mostrato come Collezionista SN nell’app Zonergy (per esempio VD0600...). Viene usato soltanto per richieste di lettura dei registri in tempo reale.",
-        "title": "Configura l’accesso ai registri in tempo reale"
-      }
-    }
-  },
   "entity": {
     "binary_sensor": {
-      "cloud_online": { "name": "Connessione cloud" },
-      "cloud_register_read": { "name": "Connessione registri in tempo reale" }
+      "cloud_online": { "name": "Connessione cloud" }
     },
     "sensor": {
       "battery_current": { "name": "Corrente batteria" },
