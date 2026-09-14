@@ -42,6 +42,7 @@ class ZonergyCloudDevice:
     device_id: str
     serial_number: str
     model: str
+    register_device_id: str
     raw: dict[str, Any]
 
 
@@ -140,6 +141,9 @@ class ZonergyCloudApi:
                     continue
                 serial = _first_text(row, "inverter_sn", "sn", "device_sn")
                 model = _first_text(row, "inverter_model", "model")
+                register_device_id = _first_text(
+                    row, "device_id", "collector_sn", "collectorSn"
+                )
                 devices.append(
                     ZonergyCloudDevice(
                         plant_id=plant_id,
@@ -147,13 +151,18 @@ class ZonergyCloudApi:
                         device_id=device_id,
                         serial_number=serial or device_id,
                         model=model or "Venus",
+                        register_device_id=register_device_id or serial or device_id,
                         raw=row,
                     )
                 )
         return devices
 
     async def async_device_data(
-        self, *, plant_id: str, device_id: str
+        self,
+        *,
+        plant_id: str,
+        device_id: str,
+        register_device_id: str | None = None,
     ) -> dict[str, Any]:
         """Read the current inverter and plant dashboards."""
         device = await self._request(
@@ -171,11 +180,10 @@ class ZonergyCloudApi:
         result = dict(plant_data) if isinstance(plant_data, dict) else {}
         if isinstance(device_data, dict):
             result.update(device_data)
-        register_device_id = (
-            _first_text(device_data, "device_id")
-            if isinstance(device_data, dict)
-            else ""
-        )
+        if not register_device_id and isinstance(device_data, dict):
+            register_device_id = _first_text(
+                device_data, "device_id", "collector_sn", "collectorSn"
+            )
         try:
             live_data = await self._async_read_live_registers(register_device_id)
         except ZonergyCloudError:

@@ -30,6 +30,7 @@ from .const import (
     CONF_INVERTER_MODEL,
     CONF_PLANT_ID,
     CONF_PLANT_NAME,
+    CONF_REGISTER_DEVICE_ID,
     DOMAIN,
 )
 
@@ -59,6 +60,8 @@ class ZonergyCloudCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return await self.api.async_device_data(
                 plant_id=self.entry.data[CONF_PLANT_ID],
                 device_id=self.entry.data[CONF_DEVICE_ID],
+                register_device_id=self.entry.data.get(CONF_REGISTER_DEVICE_ID)
+                or self.entry.data.get("realtime_device_id"),
             )
         except ZonergyCloudAuthError as err:
             raise ConfigEntryAuthFailed from err

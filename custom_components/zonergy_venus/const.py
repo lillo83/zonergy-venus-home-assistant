@@ -11,6 +11,7 @@ CONF_DEVICE_SN: Final = "device_sn"
 CONF_INVERTER_MODEL: Final = "inverter_model"
 CONF_PLANT_ID: Final = "plant_id"
 CONF_PLANT_NAME: Final = "plant_name"
+CONF_REGISTER_DEVICE_ID: Final = "register_device_id"
 
 CONNECTION_ESPHOME: Final = "esphome"
 CONNECTION_CLOUD: Final = "cloud"

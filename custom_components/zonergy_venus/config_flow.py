@@ -34,6 +34,7 @@ from .const import (
     CONF_INVERTER_MODEL,
     CONF_PLANT_ID,
     CONF_PLANT_NAME,
+    CONF_REGISTER_DEVICE_ID,
     CONNECTION_CLOUD,
     CONNECTION_ESPHOME,
     DEFAULT_PORT,
@@ -266,6 +267,7 @@ class ZonergyVenusConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                             CONF_PLANT_NAME: device.plant_name,
                             CONF_DEVICE_ID: device.device_id,
                             CONF_INVERTER_MODEL: device.model,
+                            CONF_REGISTER_DEVICE_ID: device.register_device_id,
                         },
                         reason="reauth_successful",
                     )
@@ -300,6 +302,7 @@ class ZonergyVenusConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             CONF_DEVICE_ID: device.device_id,
             CONF_DEVICE_SN: device.serial_number,
             CONF_INVERTER_MODEL: device.model,
+            CONF_REGISTER_DEVICE_ID: device.register_device_id,
         }
         return self.async_create_entry(
             title=f"{device.plant_name} — {device.model}", data=data
