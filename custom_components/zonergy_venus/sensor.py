@@ -176,6 +176,171 @@ CLOUD_SENSORS: tuple[ZonergyCloudSensorDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
     ),
     ZonergyCloudSensorDescription(
+        key="dcdc_temperature",
+        translation_key="dcdc_temperature",
+        value_keys=("dcdc_rad_temp",),
+        native_unit_of_measurement="°C",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    ZonergyCloudSensorDescription(
+        key="internal_temperature",
+        translation_key="internal_temperature",
+        value_keys=("internal_temp",),
+        native_unit_of_measurement="°C",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    ZonergyCloudSensorDescription(
+        key="pv_temperature",
+        translation_key="pv_temperature",
+        value_keys=("pv_temp",),
+        native_unit_of_measurement="°C",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    ZonergyCloudSensorDescription(
+        key="bus_voltage",
+        translation_key="bus_voltage",
+        value_keys=("bus_voltage",),
+        native_unit_of_measurement="V",
+        device_class=SensorDeviceClass.VOLTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    ZonergyCloudSensorDescription(
+        key="negative_bus_voltage",
+        translation_key="negative_bus_voltage",
+        value_keys=("dcbus_voltage",),
+        native_unit_of_measurement="V",
+        device_class=SensorDeviceClass.VOLTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    ZonergyCloudSensorDescription(
+        key="total_bus_voltage",
+        translation_key="total_bus_voltage",
+        value_keys=("total_dcbus_voltage",),
+        native_unit_of_measurement="V",
+        device_class=SensorDeviceClass.VOLTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    ZonergyCloudSensorDescription(
+        key="balance_bridge_current",
+        translation_key="balance_bridge_current",
+        value_keys=("balance_bridge_current",),
+        native_unit_of_measurement="A",
+        device_class=SensorDeviceClass.CURRENT,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    ZonergyCloudSensorDescription(
+        key="balance_bridge_power",
+        translation_key="balance_bridge_power",
+        value_keys=("balance_bridge_power",),
+        native_unit_of_measurement="W",
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    ZonergyCloudSensorDescription(
+        key="battery_soh",
+        translation_key="battery_soh",
+        value_keys=("battery_soh",),
+        native_unit_of_measurement="%",
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    ZonergyCloudSensorDescription(
+        key="battery_modules",
+        translation_key="battery_modules",
+        value_keys=("battery_actual_com_list",),
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    ZonergyCloudSensorDescription(
+        key="load_voltage",
+        translation_key="load_voltage",
+        value_keys=("r_load_voltage",),
+        native_unit_of_measurement="V",
+        device_class=SensorDeviceClass.VOLTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    ZonergyCloudSensorDescription(
+        key="load_current",
+        translation_key="load_current",
+        value_keys=("r_load_current",),
+        native_unit_of_measurement="A",
+        device_class=SensorDeviceClass.CURRENT,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    ZonergyCloudSensorDescription(
+        key="load_frequency",
+        translation_key="load_frequency",
+        value_keys=("load_freq",),
+        native_unit_of_measurement="Hz",
+        device_class=SensorDeviceClass.FREQUENCY,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    ZonergyCloudSensorDescription(
+        key="inverter_voltage",
+        translation_key="inverter_voltage",
+        value_keys=("r_inverter_voltage",),
+        native_unit_of_measurement="V",
+        device_class=SensorDeviceClass.VOLTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    ZonergyCloudSensorDescription(
+        key="inverter_current",
+        translation_key="inverter_current",
+        value_keys=("r_inverter_current",),
+        native_unit_of_measurement="A",
+        device_class=SensorDeviceClass.CURRENT,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    ZonergyCloudSensorDescription(
+        key="inverter_frequency",
+        translation_key="inverter_frequency",
+        value_keys=("r_inverter_freq",),
+        native_unit_of_measurement="Hz",
+        device_class=SensorDeviceClass.FREQUENCY,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    ZonergyCloudSensorDescription(
+        key="inverter_power",
+        translation_key="inverter_power",
+        value_keys=("r_inverter_power",),
+        native_unit_of_measurement="W",
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    ZonergyCloudSensorDescription(
+        key="ct_current",
+        translation_key="ct_current",
+        value_keys=("s_grid_current",),
+        native_unit_of_measurement="A",
+        device_class=SensorDeviceClass.CURRENT,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    ZonergyCloudSensorDescription(
+        key="ct_power",
+        translation_key="ct_power",
+        value_keys=("s_active_power",),
+        native_unit_of_measurement="W",
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    ZonergyCloudSensorDescription(
+        key="grid_apparent_power",
+        translation_key="grid_apparent_power",
+        value_keys=("r_apperent_power",),
+        native_unit_of_measurement="W",
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    ZonergyCloudSensorDescription(
+        key="grid_reactive_power",
+        translation_key="grid_reactive_power",
+        value_keys=("r_reactive_power",),
+        native_unit_of_measurement="W",
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    ZonergyCloudSensorDescription(
         key="today_generation",
         translation_key="today_generation",
         value_keys=("today_generation",),
@@ -199,6 +364,65 @@ CLOUD_SENSORS: tuple[ZonergyCloudSensorDescription, ...] = (
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL_INCREASING,
     ),
+    ZonergyCloudSensorDescription(
+        key="year_generation",
+        translation_key="year_generation",
+        value_keys=("year_generation",),
+        native_unit_of_measurement="kWh",
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+    ),
+    *(
+        ZonergyCloudSensorDescription(
+            key=key,
+            translation_key=key,
+            value_keys=(key,),
+            native_unit_of_measurement="kWh",
+            device_class=SensorDeviceClass.ENERGY,
+            state_class=SensorStateClass.TOTAL_INCREASING,
+        )
+        for key in (
+            "today_buy_grid",
+            "month_buy_grid",
+            "year_buy_grid",
+            "total_buy_grid",
+            "today_sell_grid",
+            "month_sell_grid",
+            "year_sell_grid",
+            "total_sell_grid",
+            "today_battery_charge",
+            "month_battery_charge",
+            "year_battery_charge",
+            "total_battery_charge",
+            "today_battery_discharge",
+            "month_battery_discharge",
+            "year_battery_discharge",
+            "total_battery_discharge",
+        )
+    ),
+    *(
+        ZonergyCloudSensorDescription(
+            key=key,
+            translation_key=key,
+            value_keys=(key,),
+            native_unit_of_measurement="min",
+            device_class=SensorDeviceClass.DURATION,
+            state_class=SensorStateClass.TOTAL_INCREASING,
+        )
+        for key in ("power_hours", "grid_hours", "work_hours")
+    ),
+    ZonergyCloudSensorDescription(
+        key="power_on_numbers",
+        translation_key="power_on_numbers",
+        value_keys=("power_on_numbers",),
+        state_class=SensorStateClass.TOTAL_INCREASING,
+    ),
+    ZonergyCloudSensorDescription(
+        key="grid_connecteds",
+        translation_key="grid_connecteds",
+        value_keys=("grid_connecteds",),
+        state_class=SensorStateClass.TOTAL_INCREASING,
+    ),
 )
 
 
@@ -211,7 +435,9 @@ async def async_setup_entry(
     manager = entry.runtime_data
     if isinstance(manager, ZonergyCloudCoordinator):
         async_add_entities(
-            ZonergyCloudSensor(manager, description) for description in CLOUD_SENSORS
+            ZonergyCloudSensor(manager, description)
+            for description in CLOUD_SENSORS
+            if any(key in manager.data for key in description.value_keys)
         )
         return
 
