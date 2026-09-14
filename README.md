@@ -17,14 +17,15 @@ Choose one connection during setup:
 | Connection | Update method | Controls | Internet required |
 |---|---|---|---|
 | ESPHome RS485 | Local push, usually the fastest | Yes | No |
-| Zonergy Cloud | Poll every 60 seconds; vendor data refreshes about every 4–5 minutes | No, read-only | Yes |
+| Zonergy Cloud | Live read-only registers every 60 seconds, with dashboard fallback | No, read-only | Yes |
 
 ESPHome reads the inverter over Modbus RTU. The integration opens one persistent
 connection to the ESPHome native API (port `6053`) and receives state updates in
 push mode. Cloud mode logs in with the same account as the Zonergy app, discovers
 the associated inverter and reads its dashboards without requiring the dongle's
-local IP address. The cloud refresh interval is controlled upstream by Zonergy;
-polling more often does not produce newer values.
+local IP address. It requests the inverter's read-only registers through the
+official dongle cloud bridge once per minute and falls back to dashboard data if
+the live request is unavailable.
 
 Supported entities:
 

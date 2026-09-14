@@ -11,6 +11,22 @@ from aiohttp import ClientError, ClientResponse, ClientSession, ClientTimeout
 
 from .const import CLOUD_BASE_URL
 
+LIVE_REGISTER_BLOCKS: tuple[dict[str, int | str], ...] = (
+    {"reg": 2100, "func": "04", "len": 3, "typ": "s16"},
+    {"reg": 2112, "func": "04", "len": 3, "typ": "s16"},
+    {"reg": 2124, "func": "04", "len": 6, "typ": "s16"},
+    {"reg": 2232, "func": "04", "len": 7, "typ": "u16"},
+    {"reg": 2241, "func": "04", "len": 2, "typ": "u16"},
+    {"reg": 2328, "func": "04", "len": 3, "typ": "s16"},
+    {"reg": 2400, "func": "04", "len": 3, "typ": "s16"},
+    {"reg": 2403, "func": "04", "len": 12, "typ": "s16"},
+    {"reg": 2445, "func": "04", "len": 4, "typ": "s16"},
+    {"reg": 2941, "func": "04", "len": 29, "typ": "s16"},
+    {"reg": 3000, "func": "04", "len": 5, "typ": "u16"},
+    {"reg": 3005, "func": "04", "len": 1, "typ": "s16"},
+    {"reg": 3006, "func": "04", "len": 17, "typ": "u16"},
+)
+
 
 class ZonergyCloudError(Exception):
     """Base error raised by the Zonergy cloud client."""
@@ -162,7 +178,32 @@ class ZonergyCloudApi:
         result = dict(plant_data) if isinstance(plant_data, dict) else {}
         if isinstance(device_data, dict):
             result.update(device_data)
+        register_device_id = (
+            _first_text(device_data, "device_id")
+            if isinstance(device_data, dict)
+            else ""
+        )
+        try:
+            live_data = await self._async_read_live_registers(register_device_id)
+        except ZonergyCloudError:
+            live_data = {}
+        result.update(live_data)
+        result["_register_read_available"] = bool(live_data)
         return result
+
+    async def _async_read_live_registers(self, device_id: str) -> dict[str, Any]:
+        """Read live inverter registers through the dongle's cloud bridge."""
+        if not device_id:
+            return {}
+        response = await self._request(
+            "POST",
+            "/dsweb/param/readDeviceData",
+            json={"did": device_id, "data": list(LIVE_REGISTER_BLOCKS)},
+        )
+        data = response.get("data")
+        if not isinstance(data, dict):
+            return {}
+        return _live_values(data)
 
     async def _request(
         self,
@@ -228,3 +269,71 @@ def _first_text(data: dict[str, Any], *keys: str) -> str:
         if value is not None and value != "":
             return str(value)
     return ""
+
+
+def _live_values(registers: dict[str, Any]) -> dict[str, Any]:
+    """Convert the Venus live register response to dashboard field names."""
+
+    def raw(address: int) -> int | None:
+        value = registers.get(str(address), registers.get(address))
+        try:
+            return int(value) if value is not None else None
+        except (TypeError, ValueError):
+            return None
+
+    def s16(address: int) -> int | None:
+        value = raw(address)
+        if value is None:
+            return None
+        value &= 0xFFFF
+        return value - 0x10000 if value & 0x8000 else value
+
+    def dword(address: int, *, signed: bool) -> int | None:
+        high = raw(address)
+        low = raw(address + 1)
+        if high is None or low is None:
+            return None
+        value = ((high & 0xFFFF) << 16) | (low & 0xFFFF)
+        if signed and value & 0x80000000:
+            value -= 0x100000000
+        return value
+
+    values: dict[str, Any] = {}
+
+    def put(key: str, value: Any) -> None:
+        if value is not None:
+            values[key] = value
+
+    put("pv1_input_voltage", _scaled(s16(2100), 0.1))
+    put("pv2_input_voltage", _scaled(s16(2101), 0.1))
+    put("pv1_input_current", _scaled(s16(2112), 0.01))
+    put("pv2_input_current", _scaled(s16(2113), 0.01))
+    put("pv1_input_power", dword(2124, signed=True))
+    put("pv2_input_power", dword(2126, signed=True))
+    put("pv_input_power", dword(2241, signed=False))
+    put("today_generation", _scaled(raw(2232), 0.1))
+    put("month_generation", _scaled(dword(2233, signed=False), 0.1))
+    put("year_generation", _scaled(dword(2235, signed=False), 0.1))
+    put("total_generation", _scaled(dword(2237, signed=False), 0.1))
+    put("inverter_rad_temp", _scaled(s16(2328), 0.1))
+    put("dcdc_rad_temp", _scaled(s16(2329), 0.1))
+    put("internal_temp", _scaled(s16(2330), 0.1))
+    put("r_grid_voltage", _scaled(s16(2400), 0.1))
+    put("r_grid_current", _scaled(s16(2401), 0.01))
+    put("r_grid_freq", _scaled(s16(2402), 0.01))
+    put("r_active_power", dword(2403, signed=True))
+    put("r_load_voltage", _scaled(s16(2445), 0.1))
+    put("r_load_current", _scaled(s16(2446), 0.01))
+    put("r_load_power", dword(2447, signed=True))
+    put("inverter_battery_voltage", _scaled(s16(2967), 0.1))
+    put("inverter_battery_current", _scaled(s16(2968), 0.01))
+    put("inverter_battery_cd_power", s16(2969))
+    put("battery_avg_voltage", _scaled(raw(3004), 0.01))
+    put("battery_current", _scaled(s16(3005), 0.01))
+    put("battery_soc", raw(3006))
+    return values
+
+
+def _scaled(value: int | None, factor: float) -> float | None:
+    """Scale a register value while preserving missing data."""
+    return round(value * factor, 3) if value is not None else None
