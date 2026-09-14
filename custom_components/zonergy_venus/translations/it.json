@@ -58,7 +58,8 @@
   },
   "entity": {
     "binary_sensor": {
-      "cloud_online": { "name": "Connessione cloud" }
+      "cloud_online": { "name": "Connessione cloud" },
+      "cloud_realtime": { "name": "Endpoint cloud in tempo reale" }
     },
     "sensor": {
       "battery_current": { "name": "Corrente batteria" },

@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
+import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
+from urllib.parse import quote
 
 from aiohttp import ClientError, ClientResponse, ClientSession, ClientTimeout
 
-from .const import CLOUD_BASE_URL
+from .const import CLOUD_BASE_URL, CLOUD_REALTIME_INTERVAL, CLOUD_SCAN_INTERVAL
 
 
 class ZonergyCloudError(Exception):
@@ -33,6 +36,7 @@ class ZonergyCloudDevice:
     device_id: str
     serial_number: str
     model: str
+    realtime_id: str
     raw: dict[str, Any]
 
 
@@ -53,6 +57,10 @@ class ZonergyCloudApi:
         self._base_url = base_url.rstrip("/")
         self._auth: str | None = None
         self._cookies: dict[str, str] = {}
+        self._last_realtime_request = 0.0
+        self._realtime_available: bool | None = None
+        self._realtime_data: dict[str, Any] = {}
+        self._realtime_data_time = 0.0
 
     async def async_login(self) -> None:
         """Authenticate using the same renewal flow as the official app."""
@@ -131,6 +139,7 @@ class ZonergyCloudApi:
                     continue
                 serial = _first_text(row, "inverter_sn", "sn", "device_sn")
                 model = _first_text(row, "inverter_model", "model")
+                realtime_id = _first_text(row, "device_id")
                 devices.append(
                     ZonergyCloudDevice(
                         plant_id=plant_id,
@@ -138,13 +147,18 @@ class ZonergyCloudApi:
                         device_id=device_id,
                         serial_number=serial or device_id,
                         model=model or "Venus",
+                        realtime_id=realtime_id or serial or device_id,
                         raw=row,
                     )
                 )
         return devices
 
     async def async_device_data(
-        self, *, plant_id: str, device_id: str
+        self,
+        *,
+        plant_id: str,
+        device_id: str,
+        realtime_device_id: str | None = None,
     ) -> dict[str, Any]:
         """Read the current inverter and plant dashboards."""
         device = await self._request(
@@ -162,6 +176,42 @@ class ZonergyCloudApi:
         result = dict(plant_data) if isinstance(plant_data, dict) else {}
         if isinstance(device_data, dict):
             result.update(device_data)
+        realtime_id = realtime_device_id
+        if not realtime_id and isinstance(device_data, dict):
+            realtime_id = _first_text(device_data, "device_id", "inverter_sn")
+        if (
+            realtime_id
+            and time.monotonic() - self._last_realtime_request
+            >= CLOUD_REALTIME_INTERVAL
+        ):
+            self._last_realtime_request = time.monotonic()
+            realtime = await self._async_realtime_data(realtime_id)
+            self._realtime_available = bool(realtime)
+            if realtime:
+                self._realtime_data = realtime
+                self._realtime_data_time = time.monotonic()
+        if (
+            self._realtime_data
+            and time.monotonic() - self._realtime_data_time
+            <= CLOUD_REALTIME_INTERVAL + CLOUD_SCAN_INTERVAL
+        ):
+            result.update(self._realtime_data)
+        result["_realtime_available"] = self._realtime_available
+        return result
+
+    async def _async_realtime_data(self, device_id: str) -> dict[str, Any]:
+        """Try the legacy read-only real-time endpoint used by older app builds."""
+        path = f"/dsweb/device/getRealtimeData/{quote(device_id, safe='')}"
+        responses = await asyncio.gather(
+            self._request("GET", path, params={"battery": 0}, timeout_seconds=8),
+            self._request("GET", path, params={"battery": 1}, timeout_seconds=8),
+            return_exceptions=True,
+        )
+        result: dict[str, Any] = {}
+        for response in responses:
+            if isinstance(response, Exception):
+                continue
+            result.update(_normalise_realtime_data(response.get("data")))
         return result
 
     async def _request(
@@ -171,6 +221,7 @@ class ZonergyCloudApi:
         *,
         authenticated: bool = True,
         retry_auth: bool = True,
+        timeout_seconds: int = 30,
         **kwargs: Any,
     ) -> dict[str, Any]:
         if authenticated and self._auth is None:
@@ -190,7 +241,7 @@ class ZonergyCloudApi:
                 method,
                 f"{self._base_url}{path}",
                 headers=headers,
-                timeout=ClientTimeout(total=30),
+                timeout=ClientTimeout(total=timeout_seconds),
                 **kwargs,
             ) as response:
                 self._cookies.update(
@@ -204,6 +255,7 @@ class ZonergyCloudApi:
                         path,
                         authenticated=True,
                         retry_auth=False,
+                        timeout_seconds=timeout_seconds,
                         **kwargs,
                     )
                 response.raise_for_status()
@@ -228,3 +280,19 @@ def _first_text(data: dict[str, Any], *keys: str) -> str:
         if value is not None and value != "":
             return str(value)
     return ""
+
+
+def _normalise_realtime_data(data: Any) -> dict[str, Any]:
+    """Convert supported real-time response shapes to a value dictionary."""
+    if isinstance(data, dict):
+        return data
+    if not isinstance(data, list):
+        return {}
+    result: dict[str, Any] = {}
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        key = _first_text(item, "key", "name", "register")
+        if key and "value" in item:
+            result[key] = item["value"]
+    return result
