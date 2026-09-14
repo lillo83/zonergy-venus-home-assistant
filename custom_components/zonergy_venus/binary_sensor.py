@@ -102,3 +102,16 @@ class ZonergyCloudRegisterSensor(ZonergyCloudEntity, BinarySensorEntity):
     def native_cloud_value(self) -> bool | None:
         """Expose the resolved value to the common availability check."""
         return self.is_on
+
+    @property
+    def extra_state_attributes(self) -> dict[str, str]:
+        """Expose register diagnostics without logging account credentials."""
+        attributes = {
+            "identificativo_usato": str(
+                self.coordinator.data.get("_register_device_id", "")
+            )
+        }
+        error = self.coordinator.data.get("_register_read_error")
+        if error:
+            attributes["ultimo_errore"] = str(error)
+        return attributes

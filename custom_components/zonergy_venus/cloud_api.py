@@ -63,6 +63,7 @@ class ZonergyCloudApi:
         self._base_url = base_url.rstrip("/")
         self._auth: str | None = None
         self._cookies: dict[str, str] = {}
+        self._working_register_device_id: str | None = None
 
     async def async_login(self) -> None:
         """Authenticate using the same renewal flow as the official app."""
@@ -180,31 +181,58 @@ class ZonergyCloudApi:
         result = dict(plant_data) if isinstance(plant_data, dict) else {}
         if isinstance(device_data, dict):
             result.update(device_data)
-        if not register_device_id and isinstance(device_data, dict):
-            register_device_id = _first_text(
-                device_data, "device_id", "collector_sn", "collectorSn"
-            )
-        try:
-            live_data = await self._async_read_live_registers(register_device_id)
-        except ZonergyCloudError:
-            live_data = {}
+        candidates = [
+            self._working_register_device_id,
+            register_device_id,
+            _first_text(device_data, "device_id", "collector_sn", "collectorSn")
+            if isinstance(device_data, dict)
+            else None,
+            device_id,
+            _first_text(result, "inverter_sn", "sn", "device_sn"),
+        ]
+        register_ids = list(dict.fromkeys(value for value in candidates if value))
+        live_data: dict[str, Any] = {}
+        register_error = "No register identifier is available"
+        used_register_id = register_ids[0] if register_ids else ""
+        errors: list[str] = []
+        for candidate in register_ids:
+            try:
+                live_data, diagnostic = await self._async_read_live_registers(candidate)
+            except ZonergyCloudError as err:
+                errors.append(f"{candidate}: {err}")
+                continue
+            if live_data:
+                self._working_register_device_id = candidate
+                used_register_id = candidate
+                register_error = ""
+                break
+            errors.append(f"{candidate}: {diagnostic}")
+        else:
+            if errors:
+                register_error = "; ".join(errors)
         result.update(live_data)
         result["_register_read_available"] = bool(live_data)
+        result["_register_device_id"] = used_register_id
+        result["_register_read_error"] = register_error
         return result
 
-    async def _async_read_live_registers(self, device_id: str) -> dict[str, Any]:
+    async def _async_read_live_registers(
+        self, device_id: str
+    ) -> tuple[dict[str, Any], str]:
         """Read live inverter registers through the dongle's cloud bridge."""
-        if not device_id:
-            return {}
         response = await self._request(
             "POST",
             "/dsweb/param/readDeviceData",
             json={"did": device_id, "data": list(LIVE_REGISTER_BLOCKS)},
         )
         data = response.get("data")
-        if not isinstance(data, dict):
-            return {}
-        return _live_values(data)
+        registers = _normalise_register_data(data)
+        values = _live_values(registers)
+        diagnostic = (
+            "No supported registers in "
+            f"{type(data).__name__} response ({len(registers)} decoded values)"
+        )
+        return values, diagnostic
 
     async def _request(
         self,
@@ -333,6 +361,44 @@ def _live_values(registers: dict[str, Any]) -> dict[str, Any]:
     put("battery_current", _scaled(s16(3005), 0.01))
     put("battery_soc", raw(3006))
     return values
+
+
+def _normalise_register_data(data: Any) -> dict[str, Any]:
+    """Flatten the register response formats used by different portal builds."""
+    registers: dict[str, Any] = {}
+
+    def visit(value: Any) -> None:
+        if isinstance(value, list):
+            for item in value:
+                visit(item)
+            return
+        if not isinstance(value, dict):
+            return
+
+        for key, item in value.items():
+            if str(key).isdigit() and not isinstance(item, (dict, list)):
+                registers[str(key)] = item
+
+        address = value.get("reg", value.get("address", value.get("start")))
+        values = value.get("data", value.get("values", value.get("value")))
+        try:
+            start = int(address) if address is not None else None
+        except (TypeError, ValueError):
+            start = None
+        if start is not None and isinstance(values, list):
+            for offset, item in enumerate(values):
+                if not isinstance(item, (dict, list)):
+                    registers[str(start + offset)] = item
+        elif start is not None and not isinstance(values, (dict, list)):
+            registers[str(start)] = values
+
+        for key in ("data", "values", "registers", "list", "rows"):
+            nested = value.get(key)
+            if isinstance(nested, (dict, list)):
+                visit(nested)
+
+    visit(data)
+    return registers
 
 
 def _scaled(value: int | None, factor: float) -> float | None:
