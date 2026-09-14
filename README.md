@@ -17,7 +17,7 @@ Choose one connection during setup:
 | Connection | Update method | Controls | Internet required |
 |---|---|---|---|
 | ESPHome RS485 | Local push, usually the fastest | Yes | No |
-| Zonergy Cloud | Poll every 30 seconds | No, read-only | Yes |
+| Zonergy Cloud | Poll every 15 seconds | No, read-only | Yes |
 
 ESPHome reads the inverter over Modbus RTU. The integration opens one persistent
 connection to the ESPHome native API (port `6053`) and receives state updates in

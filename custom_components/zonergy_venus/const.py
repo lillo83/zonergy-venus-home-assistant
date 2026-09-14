@@ -16,7 +16,7 @@ CONNECTION_ESPHOME: Final = "esphome"
 CONNECTION_CLOUD: Final = "cloud"
 
 CLOUD_BASE_URL: Final = "https://zonergy.vidagrid.com"
-CLOUD_SCAN_INTERVAL: Final = 30
+CLOUD_SCAN_INTERVAL: Final = 15
 
 PLATFORMS: Final = ["sensor", "binary_sensor", "switch", "number"]
 

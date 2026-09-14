@@ -36,7 +36,7 @@
           "password": "Password dell’app Zonergy",
           "username": "Account dell’app Zonergy"
         },
-        "description": "Usa lo stesso account dell’app ufficiale Zonergy. Questa modalità sperimentale legge soltanto i dati e si aggiorna ogni 30 secondi.",
+        "description": "Usa lo stesso account dell’app ufficiale Zonergy. Questa modalità sperimentale legge soltanto i dati e interroga il cloud ogni 15 secondi.",
         "title": "Collega Zonergy Cloud"
       },
       "cloud_device": {
