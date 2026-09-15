@@ -6,7 +6,7 @@ from aioesphomeapi.model import EntityInfo
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
 
-from .const import DOMAIN
+from .const import CONNECTION_BLUETOOTH, DOMAIN
 from .manager import ZonergyVenusManager
 
 
@@ -30,10 +30,15 @@ class ZonergyVenusEntity(Entity):
         device_name = (
             (api_info.friendly_name or api_info.name) if api_info else None
         ) or "Zonergy Venus"
+        model = (
+            "Venus hybrid inverter via ESPHome Bluetooth"
+            if manager.connection_type == CONNECTION_BLUETOOTH
+            else "Venus hybrid inverter via ESPHome RS485"
+        )
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, manager.device_identifier)},
             manufacturer="Zonergy",
-            model="Venus hybrid inverter via ESPHome RS485",
+            model=model,
             name=device_name,
             serial_number=api_info.mac_address if api_info else None,
             sw_version=api_info.esphome_version if api_info else None,

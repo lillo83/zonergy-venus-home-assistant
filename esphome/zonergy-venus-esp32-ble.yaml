@@ -1,0 +1,866 @@
+substitutions:
+  ble_pin: !secret zonergy_ble_pin
+
+esphome:
+  name: zonergy-venus-ble
+  friendly_name: Zonergy Venus Bluetooth
+  project:
+    name: lillo83.zonergy_venus_ble
+    version: "0.2.0"
+  on_boot:
+    priority: -100
+    then:
+      - delay: 60s
+      - ble_client.connect: zonergy_dongle
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+logger:
+  level: INFO
+
+api:
+
+ota:
+  - platform: esphome
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+json:
+
+esp32_ble_tracker:
+
+ble_client:
+  - mac_address: !secret zonergy_ble_mac
+    id: zonergy_dongle
+    auto_connect: false
+    on_connect:
+      then:
+        - logger.log: "Zonergy Bluetooth connected"
+    on_disconnect:
+      then:
+        - logger.log: "Zonergy Bluetooth disconnected"
+
+sensor:
+  - platform: template
+    name: "Zonergy BLE Potenza PV1"
+    id: zonergy_ble_pv1_power
+    unit_of_measurement: "W"
+    device_class: power
+    state_class: measurement
+    accuracy_decimals: 0
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Potenza PV2"
+    id: zonergy_ble_pv2_power
+    unit_of_measurement: "W"
+    device_class: power
+    state_class: measurement
+    accuracy_decimals: 0
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Potenza Fotovoltaico"
+    id: zonergy_ble_pv_total_power
+    unit_of_measurement: "W"
+    device_class: power
+    state_class: measurement
+    accuracy_decimals: 0
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Tensione PV1"
+    id: zonergy_ble_pv1_voltage
+    unit_of_measurement: "V"
+    device_class: voltage
+    state_class: measurement
+    accuracy_decimals: 1
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Tensione PV2"
+    id: zonergy_ble_pv2_voltage
+    unit_of_measurement: "V"
+    device_class: voltage
+    state_class: measurement
+    accuracy_decimals: 1
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Corrente PV1"
+    id: zonergy_ble_pv1_current
+    unit_of_measurement: "A"
+    device_class: current
+    state_class: measurement
+    accuracy_decimals: 2
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Corrente PV2"
+    id: zonergy_ble_pv2_current
+    unit_of_measurement: "A"
+    device_class: current
+    state_class: measurement
+    accuracy_decimals: 2
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Energia Prodotta Oggi"
+    id: zonergy_ble_energy_today
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Energia Prodotta Questo Mese"
+    id: zonergy_ble_energy_month
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Energia Prodotta Quest'Anno"
+    id: zonergy_ble_energy_year
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Energia Totale Prodotta"
+    id: zonergy_ble_energy_total
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Tensione Batteria"
+    id: zonergy_ble_battery_voltage
+    unit_of_measurement: "V"
+    device_class: voltage
+    state_class: measurement
+    accuracy_decimals: 1
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Corrente Batteria"
+    id: zonergy_ble_battery_current
+    unit_of_measurement: "A"
+    device_class: current
+    state_class: measurement
+    accuracy_decimals: 2
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Potenza Batteria"
+    id: zonergy_ble_battery_power
+    unit_of_measurement: "W"
+    device_class: power
+    state_class: measurement
+    accuracy_decimals: 0
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Stato di Carica Batteria"
+    id: zonergy_ble_battery_soc
+    unit_of_measurement: "%"
+    device_class: battery
+    state_class: measurement
+    accuracy_decimals: 0
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Tensione Rete"
+    id: zonergy_ble_grid_voltage
+    unit_of_measurement: "V"
+    device_class: voltage
+    state_class: measurement
+    accuracy_decimals: 1
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Corrente Rete"
+    id: zonergy_ble_grid_current
+    unit_of_measurement: "A"
+    device_class: current
+    state_class: measurement
+    accuracy_decimals: 2
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Frequenza Rete"
+    id: zonergy_ble_grid_frequency
+    unit_of_measurement: "Hz"
+    device_class: frequency
+    state_class: measurement
+    accuracy_decimals: 2
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Potenza Rete"
+    id: zonergy_ble_grid_power
+    unit_of_measurement: "W"
+    device_class: power
+    state_class: measurement
+    accuracy_decimals: 0
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Tensione Carico"
+    id: zonergy_ble_load_voltage
+    unit_of_measurement: "V"
+    device_class: voltage
+    state_class: measurement
+    accuracy_decimals: 1
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Corrente Carico"
+    id: zonergy_ble_load_current
+    unit_of_measurement: "A"
+    device_class: current
+    state_class: measurement
+    accuracy_decimals: 2
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Potenza Carico"
+    id: zonergy_ble_load_power
+    unit_of_measurement: "W"
+    device_class: power
+    state_class: measurement
+    accuracy_decimals: 0
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Temperatura Inverter"
+    id: zonergy_ble_inverter_temperature
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Temperatura DCDC"
+    id: zonergy_ble_dcdc_temperature
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Temperatura Interna"
+    id: zonergy_ble_internal_temperature
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+
+  - platform: template
+    name: "Zonergy BLE Energia Prelevata Oggi"
+    id: zonergy_ble_grid_import_today
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Energia Prelevata Questo Mese"
+    id: zonergy_ble_grid_import_month
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Energia Prelevata Quest'Anno"
+    id: zonergy_ble_grid_import_year
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Energia Prelevata Totale"
+    id: zonergy_ble_grid_import_total
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Energia Immessa Oggi"
+    id: zonergy_ble_grid_export_today
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Energia Immessa Questo Mese"
+    id: zonergy_ble_grid_export_month
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Energia Immessa Quest'Anno"
+    id: zonergy_ble_grid_export_year
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Energia Immessa Totale"
+    id: zonergy_ble_grid_export_total
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Energia Carico Oggi"
+    id: zonergy_ble_load_energy_today
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Energia Carico Questo Mese"
+    id: zonergy_ble_load_energy_month
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Energia Carico Quest'Anno"
+    id: zonergy_ble_load_energy_year
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Energia Carico Totale"
+    id: zonergy_ble_load_energy_total
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Energia Caricata Oggi"
+    id: zonergy_ble_battery_charge_today
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Energia Caricata Questo Mese"
+    id: zonergy_ble_battery_charge_month
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Energia Caricata Quest'Anno"
+    id: zonergy_ble_battery_charge_year
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Energia Totale Caricata"
+    id: zonergy_ble_battery_charge_total
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Energia Scaricata Oggi"
+    id: zonergy_ble_battery_discharge_today
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Energia Scaricata Questo Mese"
+    id: zonergy_ble_battery_discharge_month
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Energia Scaricata Quest'Anno"
+    id: zonergy_ble_battery_discharge_year
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Energia Totale Scaricata"
+    id: zonergy_ble_battery_discharge_total
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Energia PV1 Oggi"
+    id: zonergy_ble_pv1_energy_today
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Energia PV1 Questo Mese"
+    id: zonergy_ble_pv1_energy_month
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Energia PV1 Quest'Anno"
+    id: zonergy_ble_pv1_energy_year
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Energia Totale PV1"
+    id: zonergy_ble_pv1_energy_total
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Energia PV2 Oggi"
+    id: zonergy_ble_pv2_energy_today
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Energia PV2 Questo Mese"
+    id: zonergy_ble_pv2_energy_month
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Energia PV2 Quest'Anno"
+    id: zonergy_ble_pv2_energy_year
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Energia Totale PV2"
+    id: zonergy_ble_pv2_energy_total
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    update_interval: never
+
+
+text_sensor:
+  - platform: ble_client
+    ble_client_id: zonergy_dongle
+    id: zonergy_ble_data
+    name: "Dati BLE Zonergy"
+    internal: true
+    service_uuid: "EE6D7170-88C6-11E8-B444-060400EF5315"
+    characteristic_uuid: "EE6D7171-88C6-11E8-B444-060400EF5315"
+    notify: true
+    update_interval: never
+    on_value:
+      then:
+        - lambda: |-
+            json::parse_json(x, [](JsonObject root) -> bool {
+              JsonObject data = root["data"].as<JsonObject>();
+
+              if (data.isNull() || data["code"].as<int>() != 0) {
+                return false;
+              }
+
+              JsonArray regs = data["regs"].as<JsonArray>();
+
+              for (JsonVariant elemento : regs) {
+                JsonArray coppia = elemento.as<JsonArray>();
+
+                if (coppia.size() < 2) {
+                  continue;
+                }
+
+                int indirizzo = coppia[0].as<int>();
+                const char *testo_base64 = coppia[1].as<const char *>();
+
+                if (testo_base64 == nullptr) {
+                  continue;
+                }
+
+                uint8_t buffer[64];
+                size_t lunghezza = esphome::base64_decode(
+                  std::string(testo_base64),
+                  buffer,
+                  sizeof(buffer)
+                );
+
+                auto parola = [&](size_t posizione) -> uint16_t {
+                  size_t indice = posizione * 2;
+                  if (indice + 1 >= lunghezza) {
+                    return 0;
+                  }
+
+                  return
+                    (static_cast<uint16_t>(buffer[indice]) << 8) |
+                    static_cast<uint16_t>(buffer[indice + 1]);
+                };
+
+                auto parola_con_segno = [&](size_t posizione) -> int16_t {
+                  return static_cast<int16_t>(parola(posizione));
+                };
+
+                auto doppia_parola = [&](size_t posizione) -> uint32_t {
+                  return
+                    (static_cast<uint32_t>(parola(posizione)) << 16) |
+                    static_cast<uint32_t>(parola(posizione + 1));
+                };
+
+                 auto doppia_parola_con_segno = [&](size_t posizione) -> int32_t {
+                  return static_cast<int32_t>(doppia_parola(posizione));
+                };
+
+                 if (indirizzo == 2100 && lunghezza >= 4) {
+                  id(zonergy_ble_pv1_voltage).publish_state(
+                    parola(0) * 0.1f
+                  );
+
+                  id(zonergy_ble_pv2_voltage).publish_state(
+                    parola(1) * 0.1f
+                  );
+                }
+
+                if (indirizzo == 2112 && lunghezza >= 4) {
+                  id(zonergy_ble_pv1_current).publish_state(
+                    parola(0) * 0.01f
+                  );
+
+                  id(zonergy_ble_pv2_current).publish_state(
+                    parola(1) * 0.01f
+                  );
+                }
+
+                if (indirizzo == 2124 && lunghezza >= 8) {
+                  id(zonergy_ble_pv1_power).publish_state(
+                    static_cast<float>(doppia_parola(0))
+                  );
+
+                  id(zonergy_ble_pv2_power).publish_state(
+                    static_cast<float>(doppia_parola(2))
+                  );
+                }
+
+                                if (indirizzo == 2328 && lunghezza >= 6) {
+                  id(zonergy_ble_inverter_temperature).publish_state(
+                    parola_con_segno(0) * 0.1f
+                  );
+
+                  id(zonergy_ble_dcdc_temperature).publish_state(
+                    parola_con_segno(1) * 0.1f
+                  );
+
+                  id(zonergy_ble_internal_temperature).publish_state(
+                    parola_con_segno(2) * 0.1f
+                  );
+                }
+
+                  if (indirizzo == 2400 && lunghezza >= 10) {
+                  id(zonergy_ble_grid_voltage).publish_state(
+                    parola_con_segno(0) * 0.1f
+                  );
+
+                  id(zonergy_ble_grid_current).publish_state(
+                    parola_con_segno(1) * 0.01f
+                  );
+
+                  id(zonergy_ble_grid_frequency).publish_state(
+                    parola_con_segno(2) * 0.01f
+                  );
+
+                  id(zonergy_ble_grid_power).publish_state(
+                    static_cast<float>(doppia_parola_con_segno(3))
+                  );
+                }
+
+                if (indirizzo == 2445 && lunghezza >= 8) {
+                  id(zonergy_ble_load_voltage).publish_state(
+                    parola_con_segno(0) * 0.1f
+                  );
+
+                  id(zonergy_ble_load_current).publish_state(
+                    parola_con_segno(1) * 0.01f
+                  );
+
+                  id(zonergy_ble_load_power).publish_state(
+                    static_cast<float>(doppia_parola_con_segno(2))
+                  );
+                }
+
+                                if (indirizzo == 2515 && lunghezza >= 14) {
+                  id(zonergy_ble_grid_import_today).publish_state(
+                    parola(0) * 0.1f
+                  );
+
+                  id(zonergy_ble_grid_import_month).publish_state(
+                    doppia_parola(1) * 0.1f
+                  );
+
+                  id(zonergy_ble_grid_import_year).publish_state(
+                    doppia_parola(3) * 0.1f
+                  );
+
+                  id(zonergy_ble_grid_import_total).publish_state(
+                    doppia_parola(5) * 0.1f
+                  );
+                }
+
+                                if (indirizzo == 2522 && lunghezza >= 14) {
+                  id(zonergy_ble_grid_export_today).publish_state(
+                    parola(0) * 0.1f
+                  );
+
+                  id(zonergy_ble_grid_export_month).publish_state(
+                    doppia_parola(1) * 0.1f
+                  );
+
+                  id(zonergy_ble_grid_export_year).publish_state(
+                    doppia_parola(3) * 0.1f
+                  );
+
+                  id(zonergy_ble_grid_export_total).publish_state(
+                    doppia_parola(5) * 0.1f
+                  );
+                }
+
+                                if (indirizzo == 2529 && lunghezza >= 14) {
+                  id(zonergy_ble_load_energy_today).publish_state(
+                    parola(0) * 0.1f
+                  );
+                  id(zonergy_ble_load_energy_month).publish_state(
+                    doppia_parola(1) * 0.1f
+                  );
+                  id(zonergy_ble_load_energy_year).publish_state(
+                    doppia_parola(3) * 0.1f
+                  );
+                  id(zonergy_ble_load_energy_total).publish_state(
+                    doppia_parola(5) * 0.1f
+                  );
+                }
+
+                                if (indirizzo == 2541 && lunghezza >= 14) {
+                  id(zonergy_ble_battery_charge_today).publish_state(
+                    parola(0) * 0.1f
+                  );
+                  id(zonergy_ble_battery_charge_month).publish_state(
+                    doppia_parola(1) * 0.1f
+                  );
+                  id(zonergy_ble_battery_charge_year).publish_state(
+                    doppia_parola(3) * 0.1f
+                  );
+                  id(zonergy_ble_battery_charge_total).publish_state(
+                    doppia_parola(5) * 0.1f
+                  );
+                }
+
+                                if (indirizzo == 2548 && lunghezza >= 14) {
+                  id(zonergy_ble_battery_discharge_today).publish_state(
+                    parola(0) * 0.1f
+                  );
+                  id(zonergy_ble_battery_discharge_month).publish_state(
+                    doppia_parola(1) * 0.1f
+                  );
+                  id(zonergy_ble_battery_discharge_year).publish_state(
+                    doppia_parola(3) * 0.1f
+                  );
+                  id(zonergy_ble_battery_discharge_total).publish_state(
+                    doppia_parola(5) * 0.1f
+                  );
+                }
+
+                 if (indirizzo == 2967 && lunghezza >= 6) {
+                  id(zonergy_ble_battery_voltage).publish_state(
+                    parola_con_segno(0) * 0.1f
+                  );
+
+                  id(zonergy_ble_battery_current).publish_state(
+                    parola_con_segno(1) * 0.01f
+                  );
+
+                  id(zonergy_ble_battery_power).publish_state(
+                    static_cast<float>(parola_con_segno(2))
+                  );
+                }
+
+                if (indirizzo == 3004 && lunghezza >= 6) {
+                  id(zonergy_ble_battery_soc).publish_state(
+                    static_cast<float>(parola(2))
+                  );
+                }
+
+                                if (indirizzo == 2148 && lunghezza >= 28) {
+                  id(zonergy_ble_pv1_energy_today).publish_state(
+                    parola(0) * 0.1f
+                  );
+                  id(zonergy_ble_pv1_energy_month).publish_state(
+                    doppia_parola(1) * 0.1f
+                  );
+                  id(zonergy_ble_pv1_energy_year).publish_state(
+                    doppia_parola(3) * 0.1f
+                  );
+                  id(zonergy_ble_pv1_energy_total).publish_state(
+                    doppia_parola(5) * 0.1f
+                  );
+
+                  id(zonergy_ble_pv2_energy_today).publish_state(
+                    parola(7) * 0.1f
+                  );
+                  id(zonergy_ble_pv2_energy_month).publish_state(
+                    doppia_parola(8) * 0.1f
+                  );
+                  id(zonergy_ble_pv2_energy_year).publish_state(
+                    doppia_parola(10) * 0.1f
+                  );
+                  id(zonergy_ble_pv2_energy_total).publish_state(
+                    doppia_parola(12) * 0.1f
+                  );
+                }
+
+                if (indirizzo == 2232 && lunghezza >= 14) {
+                  id(zonergy_ble_energy_today).publish_state(
+                    parola(0) * 0.1f
+                  );
+
+                  id(zonergy_ble_energy_month).publish_state(
+                    doppia_parola(1) * 0.1f
+                  );
+
+                  id(zonergy_ble_energy_year).publish_state(
+                    doppia_parola(3) * 0.1f
+                  );
+
+                  id(zonergy_ble_energy_total).publish_state(
+                    doppia_parola(5) * 0.1f
+                  );
+                }
+
+                if (indirizzo == 2241 && lunghezza >= 4) {
+                  id(zonergy_ble_pv_total_power).publish_state(
+                    static_cast<float>(doppia_parola(0))
+                  );
+                }
+              }
+
+              return true;
+            });
+switch:
+  - platform: ble_client
+    ble_client_id: zonergy_dongle
+    name: "Zonergy BLE Connessione Bluetooth"
+
+interval:
+  - interval: 5s
+    then:
+      - ble_client.ble_write:
+          id: zonergy_dongle
+          service_uuid: "EE6D7170-88C6-11E8-B444-060400EF5315"
+          characteristic_uuid: "EE6D7171-88C6-11E8-B444-060400EF5315"
+          value: !lambda |-
+            std::string richiesta =
+              R"json({"type":"getRegs","pin":"${ble_pin}","data":{"regs":[[2000,1],[2100,2],[2112,2],[2124,4],[2148,14],[2232,7],[2241,2],[2967,3],[3004,3],[2400,5],[2445,4],[2328,3]]}})json";
+                          static uint8_t contatore_energia = 0;
+            contatore_energia++;
+
+            if (contatore_energia >= 12) {
+              contatore_energia = 0;
+
+              size_t inizio = richiesta.find("[[2000,1]");
+              size_t fine = richiesta.find("]]}}");
+
+              if (
+                inizio != std::string::npos &&
+                fine != std::string::npos &&
+                fine > inizio
+              ) {
+                richiesta.replace(
+                  inizio,
+                  fine - inizio + 2,
+                  "[[2515,7],[2522,7],[2529,7],[2541,7],[2548,7]]"
+                );
+              }
+            }
+            return std::vector<uint8_t>(richiesta.begin(), richiesta.end());
+
+      - delay: 2s
+
+      - component.update: zonergy_ble_data
