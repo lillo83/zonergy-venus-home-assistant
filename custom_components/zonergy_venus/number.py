@@ -10,6 +10,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
+from .const import BLE_ENTITY_PREFIX, CONNECTION_BLUETOOTH
 from .entity import ZonergyVenusEntity
 from .manager import ZonergyVenusManager
 
@@ -25,6 +26,10 @@ async def async_setup_entry(
         ZonergyNumber(manager, info)
         for info in manager.entity_infos
         if isinstance(info, NumberInfo)
+        and (
+            manager.connection_type != CONNECTION_BLUETOOTH
+            or info.name.startswith(BLE_ENTITY_PREFIX)
+        )
     )
 
 
@@ -56,7 +61,7 @@ class ZonergyNumber(ZonergyVenusEntity, NumberEntity):
     async def async_set_native_value(self, value: float) -> None:
         """Write a numeric value to the inverter."""
         if not self.manager.available:
-            raise HomeAssistantError("The ESPHome RS485 gateway is unavailable")
+            raise HomeAssistantError("The ESPHome gateway is unavailable")
         self.manager.client.number_command(
             self.info.key, value, device_id=self.info.device_id
         )

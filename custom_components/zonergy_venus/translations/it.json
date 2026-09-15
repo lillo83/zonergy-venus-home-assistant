@@ -1,15 +1,29 @@
 {
   "config": {
     "abort": {
-      "already_configured": "Questo gateway Zonergy è già configurato"
+      "already_configured": "Questo dispositivo Zonergy è già configurato",
+      "reauth_successful": "Credenziali Zonergy Cloud aggiornate"
     },
     "error": {
       "cannot_connect": "Impossibile collegarsi al gateway ESPHome",
+      "cannot_connect_cloud": "Impossibile collegarsi a Zonergy Cloud",
+      "cloud_device_missing": "L’inverter configurato in precedenza non è disponibile in questo account",
       "invalid_auth": "Password API o chiave di crittografia non valida",
-      "invalid_gateway": "Il nodo ESPHome non contiene le entità previste per Zonergy Venus"
+      "invalid_bluetooth_gateway": "Il nodo ESPHome non contiene le entità Bluetooth previste per Zonergy Venus",
+      "invalid_cloud_auth": "Account o password di Zonergy Cloud non validi",
+      "invalid_gateway": "Il nodo ESPHome non contiene le entità previste per Zonergy Venus",
+      "no_cloud_devices": "Nessun inverter trovato in questo account Zonergy Cloud"
     },
     "step": {
       "user": {
+        "menu_options": {
+          "cloud": "Zonergy Cloud (sperimentale, dongle Wi-Fi originale)",
+          "bluetooth": "Gateway Bluetooth ESPHome (dongle Wi-Fi originale)",
+          "esphome": "Gateway RS485 ESPHome"
+        },
+        "title": "Scegli il tipo di collegamento"
+      },
+      "esphome": {
         "data": {
           "encryption_key": "Chiave di crittografia API ESPHome (facoltativa)",
           "host": "Indirizzo IP o nome host dell’ESP8266",
@@ -17,8 +31,123 @@
           "port": "Porta API ESPHome"
         },
         "description": "Inserisci i dati di rete dell’ESP8266 collegato tramite RS485 all’inverter Zonergy Venus.",
-        "title": "Collega il gateway Zonergy Venus"
+        "title": "Collega il gateway ESPHome"
+      },
+      "bluetooth": {
+        "data": {
+          "encryption_key": "Chiave di crittografia API ESPHome (facoltativa)",
+          "host": "Indirizzo IP o nome host dell’ESP32",
+          "password": "Password API ESPHome precedente (facoltativa)",
+          "port": "Porta API ESPHome"
+        },
+        "description": "Inserisci i dati di rete dell’ESP32 che legge tramite Bluetooth il dongle Wi-Fi originale Zonergy. Questa modalità è locale e in sola lettura.",
+        "title": "Collega il gateway Bluetooth ESPHome"
+      },
+      "cloud": {
+        "data": {
+          "password": "Password dell’app Zonergy",
+          "username": "Account dell’app Zonergy"
+        },
+        "description": "Usa lo stesso account dell’app ufficiale Zonergy. Questa modalità in sola lettura controlla il cloud ogni 60 secondi; Zonergy aggiorna normalmente i dati di origine ogni 4–5 minuti.",
+        "title": "Collega Zonergy Cloud"
+      },
+      "cloud_device": {
+        "data": {
+          "device_id": "Inverter"
+        },
+        "description": "Scegli l’inverter da aggiungere. Per aggiungerne un altro, avvia nuovamente la configurazione.",
+        "title": "Scegli un inverter"
+      },
+      "reauth_confirm": {
+        "data": {
+          "password": "Password dell’app Zonergy",
+          "username": "Account dell’app Zonergy"
+        },
+        "description": "Inserisci le credenziali attuali dell’account Zonergy associato a questo inverter.",
+        "title": "Ricollega Zonergy Cloud"
       }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "register_device_id": "Numero di serie del dongle Wi-Fi originale"
+        },
+        "description": "Inserisci il numero mostrato come Collezionista SN nell’app Zonergy (per esempio VD0600...). Viene usato soltanto per richieste di lettura dei registri in tempo reale.",
+        "title": "Configura l’accesso ai registri in tempo reale"
+      }
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "cloud_online": { "name": "Connessione cloud" },
+      "cloud_register_read": { "name": "Connessione registri in tempo reale" }
+    },
+    "sensor": {
+      "battery_current": { "name": "Corrente batteria" },
+      "battery_modules": { "name": "Moduli batteria collegati" },
+      "battery_power": { "name": "Potenza batteria" },
+      "battery_soh": { "name": "Stato di salute batteria" },
+      "battery_soc": { "name": "Stato di carica batteria" },
+      "battery_voltage": { "name": "Tensione batteria" },
+      "balance_bridge_current": { "name": "Corrente ponte di bilanciamento" },
+      "balance_bridge_power": { "name": "Potenza ponte di bilanciamento" },
+      "bus_voltage": { "name": "Tensione bus DC" },
+      "ct_current": { "name": "Corrente misuratore CT" },
+      "ct_power": { "name": "Potenza misuratore CT" },
+      "dcdc_temperature": { "name": "Temperatura radiatore lato batteria" },
+      "grid_apparent_power": { "name": "Potenza apparente rete" },
+      "grid_connecteds": { "name": "Numero connessioni alla rete" },
+      "grid_hours": { "name": "Tempo connesso alla rete" },
+      "grid_current": { "name": "Corrente rete" },
+      "grid_frequency": { "name": "Frequenza rete" },
+      "grid_power": { "name": "Potenza rete" },
+      "grid_reactive_power": { "name": "Potenza reattiva rete" },
+      "grid_voltage": { "name": "Tensione rete" },
+      "inverter_temperature": { "name": "Temperatura inverter" },
+      "internal_temperature": { "name": "Temperatura interna" },
+      "inverter_current": { "name": "Corrente inverter" },
+      "inverter_frequency": { "name": "Frequenza inverter" },
+      "inverter_power": { "name": "Potenza inverter" },
+      "inverter_voltage": { "name": "Tensione inverter" },
+      "load_current": { "name": "Corrente carico" },
+      "load_frequency": { "name": "Frequenza carico" },
+      "load_power": { "name": "Potenza carico" },
+      "load_voltage": { "name": "Tensione carico" },
+      "month_battery_charge": { "name": "Energia caricata in batteria questo mese" },
+      "month_battery_discharge": { "name": "Energia scaricata dalla batteria questo mese" },
+      "month_buy_grid": { "name": "Energia prelevata questo mese" },
+      "month_generation": { "name": "Energia prodotta questo mese" },
+      "month_sell_grid": { "name": "Energia immessa questo mese" },
+      "negative_bus_voltage": { "name": "Tensione bus DC negativo" },
+      "power_hours": { "name": "Tempo di accensione" },
+      "power_on_numbers": { "name": "Numero accensioni" },
+      "pv1_current": { "name": "Corrente PV1" },
+      "pv1_power": { "name": "Potenza PV1" },
+      "pv1_voltage": { "name": "Tensione PV1" },
+      "pv2_current": { "name": "Corrente PV2" },
+      "pv2_power": { "name": "Potenza PV2" },
+      "pv2_voltage": { "name": "Tensione PV2" },
+      "pv_power": { "name": "Potenza fotovoltaico" },
+      "pv_temperature": { "name": "Temperatura fotovoltaico" },
+      "today_generation": { "name": "Energia prodotta oggi" },
+      "today_battery_charge": { "name": "Energia caricata in batteria oggi" },
+      "today_battery_discharge": { "name": "Energia scaricata dalla batteria oggi" },
+      "today_buy_grid": { "name": "Energia prelevata oggi" },
+      "today_sell_grid": { "name": "Energia immessa oggi" },
+      "total_battery_charge": { "name": "Energia totale caricata in batteria" },
+      "total_battery_discharge": { "name": "Energia totale scaricata dalla batteria" },
+      "total_buy_grid": { "name": "Energia totale prelevata" },
+      "total_generation": { "name": "Energia totale prodotta" },
+      "total_bus_voltage": { "name": "Tensione totale bus DC" },
+      "total_sell_grid": { "name": "Energia totale immessa" },
+      "work_hours": { "name": "Tempo di funzionamento" },
+      "year_battery_charge": { "name": "Energia caricata in batteria quest’anno" },
+      "year_battery_discharge": { "name": "Energia scaricata dalla batteria quest’anno" },
+      "year_buy_grid": { "name": "Energia prelevata quest’anno" },
+      "year_generation": { "name": "Energia prodotta quest’anno" },
+      "year_sell_grid": { "name": "Energia immessa quest’anno" }
     }
   }
 }

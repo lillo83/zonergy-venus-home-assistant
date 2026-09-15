@@ -1,15 +1,29 @@
 {
   "config": {
     "abort": {
-      "already_configured": "This Zonergy gateway is already configured"
+      "already_configured": "This Zonergy device is already configured",
+      "reauth_successful": "Zonergy Cloud credentials updated"
     },
     "error": {
       "cannot_connect": "Unable to connect to the ESPHome gateway",
+      "cannot_connect_cloud": "Unable to connect to Zonergy Cloud",
+      "cloud_device_missing": "The previously configured inverter is not available in this account",
       "invalid_auth": "Invalid API password or encryption key",
-      "invalid_gateway": "The ESPHome node does not contain the expected Zonergy Venus entities"
+      "invalid_bluetooth_gateway": "The ESPHome node does not contain the expected Zonergy Bluetooth entities",
+      "invalid_cloud_auth": "The Zonergy Cloud account or password is invalid",
+      "invalid_gateway": "The ESPHome node does not contain the expected Zonergy Venus entities",
+      "no_cloud_devices": "No inverter was found in this Zonergy Cloud account"
     },
     "step": {
       "user": {
+        "menu_options": {
+          "cloud": "Zonergy Cloud (experimental, original Wi-Fi dongle)",
+          "bluetooth": "ESPHome Bluetooth gateway (original Wi-Fi dongle)",
+          "esphome": "ESPHome RS485 gateway"
+        },
+        "title": "Choose how to connect"
+      },
+      "esphome": {
         "data": {
           "encryption_key": "ESPHome API encryption key (optional)",
           "host": "ESP8266 IP address or hostname",
@@ -17,8 +31,123 @@
           "port": "ESPHome API port"
         },
         "description": "Enter the network details of the ESP8266 connected to your Zonergy Venus inverter through RS485.",
-        "title": "Connect the Zonergy Venus gateway"
+        "title": "Connect the ESPHome gateway"
+      },
+      "bluetooth": {
+        "data": {
+          "encryption_key": "ESPHome API encryption key (optional)",
+          "host": "ESP32 IP address or hostname",
+          "password": "Legacy ESPHome API password (optional)",
+          "port": "ESPHome API port"
+        },
+        "description": "Enter the network details of the ESP32 that reads the original Zonergy Wi-Fi dongle over Bluetooth. This mode is local and read-only.",
+        "title": "Connect the ESPHome Bluetooth gateway"
+      },
+      "cloud": {
+        "data": {
+          "password": "Zonergy app password",
+          "username": "Zonergy app account"
+        },
+        "description": "Use the same account as the official Zonergy app. This read-only mode checks the cloud every 60 seconds; Zonergy normally refreshes the source data every 4–5 minutes.",
+        "title": "Connect to Zonergy Cloud"
+      },
+      "cloud_device": {
+        "data": {
+          "device_id": "Inverter"
+        },
+        "description": "Choose the inverter to add. You can run setup again for another inverter.",
+        "title": "Choose an inverter"
+      },
+      "reauth_confirm": {
+        "data": {
+          "password": "Zonergy app password",
+          "username": "Zonergy app account"
+        },
+        "description": "Enter the current credentials for the Zonergy account linked to this inverter.",
+        "title": "Reconnect Zonergy Cloud"
       }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "register_device_id": "Original Wi-Fi dongle serial number"
+        },
+        "description": "Enter the collector serial shown as Collector SN in the Zonergy app (for example VD0600...). This is used only for read-only live register requests.",
+        "title": "Configure live register access"
+      }
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "cloud_online": { "name": "Cloud connection" },
+      "cloud_register_read": { "name": "Live register connection" }
+    },
+    "sensor": {
+      "battery_current": { "name": "Battery current" },
+      "battery_modules": { "name": "Connected battery modules" },
+      "battery_power": { "name": "Battery power" },
+      "battery_soh": { "name": "Battery state of health" },
+      "battery_soc": { "name": "Battery state of charge" },
+      "battery_voltage": { "name": "Battery voltage" },
+      "balance_bridge_current": { "name": "Balance bridge current" },
+      "balance_bridge_power": { "name": "Balance bridge power" },
+      "bus_voltage": { "name": "DC bus voltage" },
+      "ct_current": { "name": "CT meter current" },
+      "ct_power": { "name": "CT meter power" },
+      "dcdc_temperature": { "name": "Battery-side radiator temperature" },
+      "grid_apparent_power": { "name": "Grid apparent power" },
+      "grid_connecteds": { "name": "Grid connection count" },
+      "grid_hours": { "name": "Grid-connected time" },
+      "grid_current": { "name": "Grid current" },
+      "grid_frequency": { "name": "Grid frequency" },
+      "grid_power": { "name": "Grid power" },
+      "grid_reactive_power": { "name": "Grid reactive power" },
+      "grid_voltage": { "name": "Grid voltage" },
+      "inverter_temperature": { "name": "Inverter temperature" },
+      "internal_temperature": { "name": "Internal temperature" },
+      "inverter_current": { "name": "Inverter current" },
+      "inverter_frequency": { "name": "Inverter frequency" },
+      "inverter_power": { "name": "Inverter power" },
+      "inverter_voltage": { "name": "Inverter voltage" },
+      "load_current": { "name": "Load current" },
+      "load_frequency": { "name": "Load frequency" },
+      "load_power": { "name": "Load power" },
+      "load_voltage": { "name": "Load voltage" },
+      "month_battery_charge": { "name": "Battery energy charged this month" },
+      "month_battery_discharge": { "name": "Battery energy discharged this month" },
+      "month_buy_grid": { "name": "Energy imported this month" },
+      "month_generation": { "name": "Energy generated this month" },
+      "month_sell_grid": { "name": "Energy exported this month" },
+      "negative_bus_voltage": { "name": "Negative DC bus voltage" },
+      "power_hours": { "name": "Powered-on time" },
+      "power_on_numbers": { "name": "Power-on count" },
+      "pv1_current": { "name": "PV1 current" },
+      "pv1_power": { "name": "PV1 power" },
+      "pv1_voltage": { "name": "PV1 voltage" },
+      "pv2_current": { "name": "PV2 current" },
+      "pv2_power": { "name": "PV2 power" },
+      "pv2_voltage": { "name": "PV2 voltage" },
+      "pv_power": { "name": "PV power" },
+      "pv_temperature": { "name": "PV temperature" },
+      "today_generation": { "name": "Energy generated today" },
+      "today_battery_charge": { "name": "Battery energy charged today" },
+      "today_battery_discharge": { "name": "Battery energy discharged today" },
+      "today_buy_grid": { "name": "Energy imported today" },
+      "today_sell_grid": { "name": "Energy exported today" },
+      "total_battery_charge": { "name": "Total battery energy charged" },
+      "total_battery_discharge": { "name": "Total battery energy discharged" },
+      "total_buy_grid": { "name": "Total imported energy" },
+      "total_generation": { "name": "Total generated energy" },
+      "total_bus_voltage": { "name": "Total DC bus voltage" },
+      "total_sell_grid": { "name": "Total exported energy" },
+      "work_hours": { "name": "Operating time" },
+      "year_battery_charge": { "name": "Battery energy charged this year" },
+      "year_battery_discharge": { "name": "Battery energy discharged this year" },
+      "year_buy_grid": { "name": "Energy imported this year" },
+      "year_generation": { "name": "Energy generated this year" },
+      "year_sell_grid": { "name": "Energy exported this year" }
     }
   }
 }

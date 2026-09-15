@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable
 import logging
+from collections.abc import Callable
 
 from aioesphomeapi import APIClient, ReconnectLogic
 from aioesphomeapi.model import DeviceInfo, EntityInfo, EntityState
@@ -24,6 +24,7 @@ class ZonergyVenusManager:
         port: int,
         password: str | None,
         encryption_key: str | None,
+        connection_type: str,
     ) -> None:
         self.hass = hass
         self.host = host
@@ -32,6 +33,7 @@ class ZonergyVenusManager:
         self.entity_infos: list[EntityInfo] = []
         self.states: dict[tuple[int, int], EntityState] = {}
         self.last_error: Exception | None = None
+        self.connection_type = connection_type
         self._ready = asyncio.Event()
         self._listeners: set[Callable[[], None]] = set()
 
@@ -68,9 +70,7 @@ class ZonergyVenusManager:
 
     async def _async_on_connect(self) -> None:
         """Load metadata and subscribe to live state updates."""
-        device_info, entity_infos, _ = (
-            await self.client.device_info_and_list_entities()
-        )
+        device_info, entity_infos, _ = await self.client.device_info_and_list_entities()
         self.device_info = device_info
         self.entity_infos = entity_infos
         self.client.subscribe_states(self._on_state)

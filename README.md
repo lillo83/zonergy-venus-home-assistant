@@ -1,19 +1,34 @@
 # Zonergy Venus for Home Assistant
 
-Custom integration for **Zonergy Venus hybrid inverters** connected through an
-ESP8266/ESPHome RS485 gateway.
+Custom integration for **Zonergy Venus hybrid inverters**. It supports a local
+ESP8266/ESPHome RS485 gateway, a local ESP32 Bluetooth gateway for the original
+Zonergy Wi-Fi dongle, or the same cloud service used by the official app.
 
 > [!IMPORTANT]
-> Version 0.1.0 is the first public version, tested on a real installation.
-> Reading is passive, while switches
-> and number controls write real values to the inverter. Use the controls only
-> if their meaning and limits match your inverter model.
+> Version 0.2.0 adds an experimental, read-only Zonergy Cloud connection. The
+> existing ESPHome mode is unchanged. Its switches and number controls write
+> real values to the inverter, so use them only if their meaning and limits
+> match your inverter model.
 
 ## How it works
 
-The inverter is read by ESPHome over Modbus RTU. This integration opens one
-persistent connection to the ESPHome native API (port `6053`), receives state
-updates in push mode and reconnects automatically.
+Choose one connection during setup:
+
+| Connection | Update method | Controls | Internet required |
+|---|---|---|---|
+| ESPHome RS485 | Local push, usually the fastest | Yes | No |
+| ESPHome Bluetooth | Local push, live values about every 5 seconds | No, read-only | No |
+| Zonergy Cloud (experimental) | Live read-only registers every 60 seconds, with dashboard fallback | No, read-only | Yes |
+
+ESPHome reads the inverter over Modbus RTU. The integration opens one persistent
+connection to the ESPHome native API (port `6053`) and receives state updates in
+push mode. Bluetooth mode uses an ESP32 near the original Wi-Fi dongle and reads
+its BLE register service locally; the dongle remains connected to Zonergy Cloud.
+Cloud mode logs in with the same account as the Zonergy app, discovers
+the associated inverter and reads its dashboards without requiring the dongle's
+local IP address. It requests the inverter's read-only registers through the
+official dongle cloud bridge once per minute and falls back to dashboard data if
+the live request is unavailable.
 
 Supported entities:
 
@@ -28,9 +43,13 @@ Supported entities:
 
 - Home Assistant with HACS installed
 - Zonergy Venus compatible inverter
-- ESP8266 D1 Mini and TTL/RS485 transceiver
-- the companion ESPHome firmware in
+- for local mode: ESP8266 D1 Mini, TTL/RS485 transceiver and the companion
+  ESPHome firmware in
   [`esphome/zonergy-venus-esp8266.yaml`](esphome/zonergy-venus-esp8266.yaml)
+- for Bluetooth mode: ESP32 with Bluetooth support, placed within radio range
+  of the original Zonergy Wi-Fi dongle, and the companion firmware in
+  [`esphome/zonergy-venus-esp32-ble.yaml`](esphome/zonergy-venus-esp32-ble.yaml)
+- for cloud mode: the original dongle online and a working Zonergy app account
 
 The integration also accepts the original tested firmware as long as it exposes
 the expected entities. The firmware included here is based on that working
@@ -48,11 +67,25 @@ configuration, with Wi-Fi credentials removed.
 5. Search for **Zonergy Venus**, open it and press **Download**.
 6. Restart Home Assistant.
 7. Go to **Settings → Devices & services → Add integration**.
-8. Search for **Zonergy Venus** and enter the ESP8266 IP address.
+8. Search for **Zonergy Venus** and choose **ESPHome RS485 gateway**,
+   **ESPHome Bluetooth gateway (original Wi-Fi dongle)**, or
+   **Zonergy Cloud (experimental, original Wi-Fi dongle)**.
 
-Use port `6053`. With the original firmware, leave both the encryption key and
-legacy password empty. If API encryption is enabled in ESPHome, enter the same
-key in the setup form.
+For ESPHome, use port `6053`. With the original firmware, leave both the
+encryption key and legacy password empty. If API encryption is enabled in
+ESPHome, enter the same key in the setup form.
+
+Bluetooth mode is read-only and requires the companion ESP32 firmware. Copy
+[`esphome/secrets.yaml.example`](esphome/secrets.yaml.example) to
+`secrets.yaml`, then configure the Wi-Fi credentials, dongle Bluetooth address
+and local PIN. Never publish a completed personal YAML containing those values.
+The firmware updates live measurements every 5 seconds and the larger energy
+counters about once per minute.
+
+For cloud mode, enter the same account and password used in the Zonergy app.
+Credentials remain in the Home Assistant configuration and are sent only to the
+Zonergy service. Do not post them in issues or logs. Cloud availability and
+refresh speed depend on the vendor service.
 
 ## ESPHome firmware
 
@@ -88,6 +121,8 @@ intend to use enabled.
 
 - Confirm that Home Assistant can reach the ESP8266 on TCP port `6053`.
 - Assign the ESP8266 a DHCP reservation so its address does not change.
+- For cloud mode, first confirm that the inverter is online and updating in the
+  official Zonergy app. The dongle does not need to expose a web page locally.
 - If setup reports an invalid gateway, flash the companion YAML or verify that
   `Potenza Totale PV`, `Potenza Carico` and `SOC Medio Batteria` are present.
 - Open a GitHub issue and include the Home Assistant version, integration
