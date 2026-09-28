@@ -69,8 +69,25 @@
     }
   },
   "options": {
+    "error": {
+      "cannot_connect": "Unable to connect to the ESPHome gateway",
+      "invalid_auth": "Invalid API password or encryption key",
+      "invalid_gateway": "The ESPHome node does not contain the expected Zonergy Venus entities",
+      "invalid_bluetooth_gateway": "The ESPHome node does not contain the expected Zonergy Bluetooth entities",
+      "different_gateway": "This is a different ESPHome device. Enter the address of the previously configured gateway."
+    },
     "step": {
-      "init": {
+      "local": {
+        "data": {
+          "host": "ESPHome IP address or hostname",
+          "port": "ESPHome API port",
+          "encryption_key": "ESPHome API encryption key (optional)",
+          "password": "Legacy ESPHome API password (optional)"
+        },
+        "description": "The gateway connection is checked before saving.",
+        "title": "Configure ESPHome connection"
+      },
+      "cloud": {
         "data": {
           "register_device_id": "Original Wi-Fi dongle serial number"
         },
