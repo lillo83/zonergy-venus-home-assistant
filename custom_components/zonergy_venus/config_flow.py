@@ -98,7 +98,7 @@ class ZonergyVenusConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     def async_get_options_flow(
         config_entry: config_entries.ConfigEntry,
     ) -> ZonergyVenusOptionsFlow:
-        """Return the cloud options flow."""
+        """Return options for the configured connection."""
         return ZonergyVenusOptionsFlow()
 
     async def async_step_user(
@@ -382,9 +382,113 @@ class ZonergyVenusConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 
 class ZonergyVenusOptionsFlow(config_entries.OptionsFlow):
-    """Configure optional cloud register access."""
+    """Configure the existing cloud or local gateway connection."""
 
     async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Show options for the configured connection type."""
+        connection_type = self.config_entry.data.get(
+            CONF_CONNECTION_TYPE,
+            CONNECTION_ESPHOME
+            if CONF_HOST in self.config_entry.data
+            else CONNECTION_CLOUD,
+        )
+        if connection_type == CONNECTION_CLOUD:
+            return await self.async_step_cloud(user_input)
+        return await self.async_step_local(user_input)
+
+    async def async_step_local(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Validate and update the ESPHome API address and credentials."""
+        errors: dict[str, str] = {}
+        connection_type = self.config_entry.data.get(
+            CONF_CONNECTION_TYPE, CONNECTION_ESPHOME
+        )
+        required_entities = (
+            BLE_REQUIRED_ENTITY_NAMES
+            if connection_type == CONNECTION_BLUETOOTH
+            else REQUIRED_ENTITY_NAMES
+        )
+
+        if user_input is not None:
+            try:
+                device_info, _ = await async_validate_input(
+                    user_input, required_entities
+                )
+            except (InvalidAuthAPIError, InvalidEncryptionKeyAPIError):
+                errors["base"] = "invalid_auth"
+            except CannotConnect:
+                errors["base"] = "cannot_connect"
+            except InvalidGateway:
+                errors["base"] = (
+                    "invalid_bluetooth_gateway"
+                    if connection_type == CONNECTION_BLUETOOTH
+                    else "invalid_gateway"
+                )
+            else:
+                # Keep the existing entry attached to its original ESPHome node.
+                mac = device_info.mac_address.replace(":", "").lower()
+                if self.config_entry.unique_id and mac != self.config_entry.unique_id:
+                    errors["base"] = "different_gateway"
+                else:
+                    self.hass.config_entries.async_update_entry(
+                        self.config_entry,
+                        data={
+                            **self.config_entry.data,
+                            CONF_HOST: user_input[CONF_HOST],
+                            CONF_PORT: user_input[CONF_PORT],
+                            CONF_ENCRYPTION_KEY: user_input.get(
+                                CONF_ENCRYPTION_KEY, ""
+                            ),
+                            CONF_PASSWORD: user_input.get(CONF_PASSWORD, ""),
+                        },
+                    )
+                    await self.hass.config_entries.async_reload(
+                        self.config_entry.entry_id
+                    )
+                    return self.async_create_entry(data=self.config_entry.options)
+
+        schema = vol.Schema(
+            {
+                vol.Required(
+                    CONF_HOST,
+                    default=self.config_entry.data.get(CONF_HOST, ""),
+                ): selector.TextSelector(),
+                vol.Required(
+                    CONF_PORT,
+                    default=self.config_entry.data.get(CONF_PORT, DEFAULT_PORT),
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=1,
+                        max=65535,
+                        mode=selector.NumberSelectorMode.BOX,
+                    )
+                ),
+                vol.Optional(
+                    CONF_ENCRYPTION_KEY,
+                    default=self.config_entry.data.get(CONF_ENCRYPTION_KEY, ""),
+                ): selector.TextSelector(
+                    selector.TextSelectorConfig(
+                        type=selector.TextSelectorType.PASSWORD
+                    )
+                ),
+                vol.Optional(
+                    CONF_PASSWORD,
+                    default=self.config_entry.data.get(CONF_PASSWORD, ""),
+                ): selector.TextSelector(
+                    selector.TextSelectorConfig(
+                        type=selector.TextSelectorType.PASSWORD
+                    )
+                ),
+            }
+        )
+        return self.async_show_form(
+            step_id="local", data_schema=schema, errors=errors
+        )
+
+    async def async_step_cloud(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Set the original Wi-Fi dongle serial number."""
@@ -396,7 +500,7 @@ class ZonergyVenusOptionsFlow(config_entries.OptionsFlow):
             self.config_entry.data.get(CONF_REGISTER_DEVICE_ID, ""),
         )
         return self.async_show_form(
-            step_id="init",
+            step_id="cloud",
             data_schema=vol.Schema(
                 {
                     vol.Required(
