@@ -80,7 +80,9 @@ Bluetooth mode is read-only and requires the companion ESP32 firmware. Copy
 `secrets.yaml`, then configure the Wi-Fi credentials, dongle Bluetooth address
 and local PIN. Never publish a completed personal YAML containing those values.
 The firmware updates live measurements every 5 seconds and the larger energy
-counters about once per minute.
+counters about once per minute. A self-healing watchdog rebuilds the Bluetooth
+connection after 90 seconds without inverter packets and restarts the ESP32
+only if data still does not resume.
 
 For cloud mode, enter the same account and password used in the Zonergy app.
 Credentials remain in the Home Assistant configuration and are sent only to the
