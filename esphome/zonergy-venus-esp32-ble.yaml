@@ -10,6 +10,9 @@ esphome:
   on_boot:
     priority: -100
     then:
+      - lambda: |-
+          id(last_ble_packet_ms) = millis();
+          id(ble_recovery_attempts) = 0;
       - delay: 60s
       - ble_client.connect: zonergy_dongle
 
@@ -32,6 +35,17 @@ wifi:
 
 json:
 
+globals:
+  - id: last_ble_packet_ms
+    type: uint32_t
+    restore_value: false
+    initial_value: '0'
+
+  - id: ble_recovery_attempts
+    type: uint8_t
+    restore_value: false
+    initial_value: '0'
+
 esp32_ble_tracker:
 
 ble_client:
@@ -41,6 +55,10 @@ ble_client:
     on_connect:
       then:
         - logger.log: "Zonergy Bluetooth connected"
+        - lambda: |-
+            // Allow time for the first response. The recovery counter is
+            // cleared only after an actual BLE packet is received.
+            id(last_ble_packet_ms) = millis();
     on_disconnect:
       then:
         - logger.log: "Zonergy Bluetooth disconnected"
@@ -269,6 +287,7 @@ sensor:
     device_class: temperature
     state_class: measurement
     accuracy_decimals: 1
+    update_interval: never
 
   - platform: template
     name: "Zonergy BLE Energia Prelevata Oggi"
@@ -536,6 +555,11 @@ text_sensor:
     on_value:
       then:
         - lambda: |-
+            // A received packet proves that BLE data is flowing, rather than
+            // merely reporting an established GATT connection.
+            id(last_ble_packet_ms) = millis();
+            id(ble_recovery_attempts) = 0;
+
             json::parse_json(x, [](JsonObject root) -> bool {
               JsonObject data = root["data"].as<JsonObject>();
 
@@ -828,6 +852,12 @@ switch:
     ble_client_id: zonergy_dongle
     name: "Zonergy BLE Connessione Bluetooth"
 
+button:
+  - platform: restart
+    id: restart_zonergy_ble_gateway
+    name: "Zonergy BLE Riavvia Gateway"
+    entity_category: diagnostic
+
 interval:
   - interval: 5s
     then:
@@ -864,3 +894,32 @@ interval:
       - delay: 2s
 
       - component.update: zonergy_ble_data
+
+  # Detect a GATT connection that remains formally established but stops
+  # delivering inverter notifications. First rebuild only the BLE connection;
+  # restart the ESP32 only if data still does not resume.
+  - interval: 30s
+    then:
+      - if:
+          condition:
+            lambda: |-
+              return (uint32_t)(millis() - id(last_ble_packet_ms)) > 90000UL;
+          then:
+            - if:
+                condition:
+                  lambda: |-
+                    return id(ble_recovery_attempts) == 0;
+                then:
+                  - lambda: |-
+                      id(ble_recovery_attempts) = 1;
+                  - logger.log:
+                      level: WARN
+                      format: "No Zonergy BLE data for 90 seconds; reconnecting"
+                  - ble_client.disconnect: zonergy_dongle
+                  - delay: 5s
+                  - ble_client.connect: zonergy_dongle
+                else:
+                  - logger.log:
+                      level: ERROR
+                      format: "Zonergy BLE still stalled; restarting ESP32"
+                  - button.press: restart_zonergy_ble_gateway

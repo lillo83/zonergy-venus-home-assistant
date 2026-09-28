@@ -3,6 +3,9 @@
 ## 0.2.0
 
 - adds a third setup choice for a local ESPHome Bluetooth gateway
+- adds a self-healing watchdog to the companion BLE firmware: after 90 seconds
+  without inverter packets it rebuilds the BLE connection, then restarts the
+  ESP32 only if data does not resume
 - keeps the existing ESPHome RS485 connection and its writable controls
 - keeps the experimental read-only Zonergy Cloud connection
 - recognizes the tested BLE companion firmware and exposes only its Zonergy
