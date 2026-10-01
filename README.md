@@ -84,6 +84,34 @@ counters about once per minute. A self-healing watchdog rebuilds the Bluetooth
 connection after 90 seconds without inverter packets and restarts the ESP32
 only if data still does not resume.
 
+### BLE battery SOC in beta.17
+
+The existing **Zonergy BLE Stato di Carica Batteria** entity reports the mean
+SOC supplied by register `3006`; its name is preserved. The BLE firmware now
+reads five words starting at `3004` and adds:
+
+| Entity | Source | Unit |
+|---|---|---|
+| Zonergy BLE SOC Batteria Max | Register 3007 | % |
+| Zonergy BLE SOC Batteria Min | Register 3008 | % |
+| Zonergy BLE Delta SOC Batterie | Maximum minus minimum SOC | percentage points, displayed as % |
+
+Maximum and minimum describe the battery modules as a group, not fixed battery
+numbers. A maximum of 90% and a minimum of 85% gives a delta of 5 percentage
+points. Short replies or invalid ranges leave these three values unknown.
+The integration discovers them automatically from the updated firmware.
+
+**Updating through HACS does not flash the ESP32.** To obtain these values:
+
+1. Update the integration to `v0.2.0-beta.17` and restart Home Assistant.
+2. Update the BLE node using
+   [`esphome/zonergy-venus-esp32-ble.yaml`](esphome/zonergy-venus-esp32-ble.yaml),
+   retaining your node name, Wi-Fi/API settings and personal secrets.
+3. Run **Validate** in ESPHome before installing the firmware.
+4. Install the firmware, then reload the Zonergy Venus integration so it
+   discovers the new entities. For a node managed by the standard ESPHome
+   integration, check its device page for the new sensors.
+
 For cloud mode, enter the same account and password used in the Zonergy app.
 Credentials remain in the Home Assistant configuration and are sent only to the
 Zonergy service. Do not post them in issues or logs. Cloud availability and
