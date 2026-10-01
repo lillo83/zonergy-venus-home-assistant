@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.0-beta.17 — 2026-10-01
+
+- extends the BLE read at register 3004 from three to five words
+- preserves the existing battery state-of-charge entity as mean SOC (3006)
+- adds maximum SOC (3007), minimum SOC (3008) and their difference
+- reports the new values as unknown for short replies or invalid SOC ranges
+- documents the ESP32 firmware update required to obtain these measurements;
+  updating the integration through HACS alone does not update the ESP32
+
 ## 0.2.0
 
 - adds a third setup choice for a local ESPHome Bluetooth gateway

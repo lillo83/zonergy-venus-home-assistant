@@ -6,7 +6,7 @@ esphome:
   friendly_name: Zonergy Venus Bluetooth
   project:
     name: lillo83.zonergy_venus_ble
-    version: "0.2.0"
+    version: "0.2.0-beta.17"
   on_boot:
     priority: -100
     then:
@@ -195,6 +195,33 @@ sensor:
     id: zonergy_ble_battery_soc
     unit_of_measurement: "%"
     device_class: battery
+    state_class: measurement
+    accuracy_decimals: 0
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE SOC Batteria Max"
+    id: zonergy_ble_battery_soc_max
+    unit_of_measurement: "%"
+    device_class: battery
+    state_class: measurement
+    accuracy_decimals: 0
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE SOC Batteria Min"
+    id: zonergy_ble_battery_soc_min
+    unit_of_measurement: "%"
+    device_class: battery
+    state_class: measurement
+    accuracy_decimals: 0
+    update_interval: never
+
+  - platform: template
+    name: "Zonergy BLE Delta SOC Batterie"
+    id: zonergy_ble_battery_soc_delta
+    unit_of_measurement: "%"
+    icon: mdi:battery-sync
     state_class: measurement
     accuracy_decimals: 0
     update_interval: never
@@ -787,9 +814,28 @@ text_sensor:
                 }
 
                 if (indirizzo == 3004 && lunghezza >= 6) {
+                  // Register 3006 is the mean SOC. Keep the existing entity.
                   id(zonergy_ble_battery_soc).publish_state(
                     static_cast<float>(parola(2))
                   );
+
+                  // Registers 3007/3008 contain maximum/minimum module SOC.
+                  // Do not interpret missing words in a short reply as zero.
+                  float soc_max = NAN;
+                  float soc_min = NAN;
+                  float soc_delta = NAN;
+                  if (lunghezza >= 10) {
+                    const uint16_t massimo = parola(3);
+                    const uint16_t minimo = parola(4);
+                    if (massimo <= 100 && minimo <= massimo) {
+                      soc_max = static_cast<float>(massimo);
+                      soc_min = static_cast<float>(minimo);
+                      soc_delta = static_cast<float>(massimo - minimo);
+                    }
+                  }
+                  id(zonergy_ble_battery_soc_max).publish_state(soc_max);
+                  id(zonergy_ble_battery_soc_min).publish_state(soc_min);
+                  id(zonergy_ble_battery_soc_delta).publish_state(soc_delta);
                 }
 
                                 if (indirizzo == 2148 && lunghezza >= 28) {
@@ -867,7 +913,7 @@ interval:
           characteristic_uuid: "EE6D7171-88C6-11E8-B444-060400EF5315"
           value: !lambda |-
             std::string richiesta =
-              R"json({"type":"getRegs","pin":"${ble_pin}","data":{"regs":[[2000,1],[2100,2],[2112,2],[2124,4],[2148,14],[2232,7],[2241,2],[2967,3],[3004,3],[2400,5],[2445,4],[2328,3]]}})json";
+              R"json({"type":"getRegs","pin":"${ble_pin}","data":{"regs":[[2000,1],[2100,2],[2112,2],[2124,4],[2148,14],[2232,7],[2241,2],[2967,3],[3004,5],[2400,5],[2445,4],[2328,3]]}})json";
                           static uint8_t contatore_energia = 0;
             contatore_energia++;
 

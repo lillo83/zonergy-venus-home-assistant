@@ -1,0 +1,60 @@
+name: Release v0.2.0-beta.17
+
+on:
+  workflow_run:
+    workflows: ["Validate"]
+    types: [completed]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - name: Check release version
+        id: version
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          version = json.loads(Path('custom_components/zonergy_venus/manifest.json').read_text())['version']
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f"matches={str(version == '0.2.0-beta.17').lower()}\n")
+          PY
+      - uses: actions/setup-python@v5
+        if: steps.version.outputs.matches == 'true'
+        with:
+          python-version: '3.12'
+      - name: Validate BLE firmware
+        if: steps.version.outputs.matches == 'true'
+        run: |
+          python -m pip install 'esphome==2026.9.0'
+          cp esphome/secrets.yaml.example esphome/secrets.yaml
+          esphome config esphome/zonergy-venus-esp32-ble.yaml >/dev/null
+          rm esphome/secrets.yaml
+      - name: Create prerelease if missing
+        if: steps.version.outputs.matches == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          if gh release view v0.2.0-beta.17 --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            echo "Release v0.2.0-beta.17 already exists"
+            exit 0
+          fi
+          gh release create v0.2.0-beta.17 \
+            --repo "${GITHUB_REPOSITORY}" \
+            --target "${TARGET_SHA}" \
+            --prerelease \
+            --title "Zonergy Venus v0.2.0-beta.17" \
+            --notes-file .github/release-notes-v0.2.0-beta.17.md
