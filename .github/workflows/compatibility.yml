@@ -1,0 +1,30 @@
+name: Compatibility
+
+# Imports the integration against the latest Home Assistant release and checks
+# that the ESPHome client API it relies on is still there. This catches
+# breaking changes in Home Assistant before users do.
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "30 3 * * 1"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  smoke:
+    name: Import against latest Home Assistant
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Install Home Assistant
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install homeassistant
+      - name: Run smoke test
+        run: python .github/scripts/smoke_test.py

@@ -41,7 +41,7 @@ class ZonergyVenusManager:
             host,
             port,
             password=password,
-            client_info="Zonergy Venus Home Assistant 0.1.0",
+            client_info="Zonergy Venus Home Assistant",
             noise_psk=encryption_key,
         )
         self._reconnect: ReconnectLogic | None = None
