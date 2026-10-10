@@ -55,16 +55,21 @@ The integration also accepts the original tested firmware as long as it exposes
 the expected entities. The firmware included here is based on that working
 configuration, with Wi-Fi credentials removed.
 
-## Install for testing through HACS
+## Installation through HACS
 
-1. In HACS open **Integrations**.
-2. Open the menu in the upper-right corner and choose **Custom repositories**.
-3. Add this URL:
+If **Zonergy Venus** does not appear when you search for it in HACS, the
+repository is not in the HACS default list yet; add it as a custom repository
+first (steps 1 to 3). Otherwise start from step 4.
+
+1. In HACS open the menu in the upper-right corner and choose
+   **Custom repositories**.
+2. Add this URL:
 
    `https://github.com/lillo83/zonergy-venus-home-assistant`
 
-4. Select category **Integration** and press **Add**.
-5. Search for **Zonergy Venus**, open it and press **Download**.
+3. Select type **Integration** and press **Add**.
+4. Search for **Zonergy Venus** in HACS.
+5. Open it and press **Download**.
 6. Restart Home Assistant.
 7. Go to **Settings → Devices & services → Add integration**.
 8. Search for **Zonergy Venus** and choose **ESPHome RS485 gateway**,
@@ -159,12 +164,16 @@ intend to use enabled.
   version, ESPHome version and the relevant log lines. Never publish passwords
   or API encryption keys.
 
-## HACS publication status
+## Validation and releases
 
-The repository is structured for HACS and includes HACS and Hassfest validation
-workflows. Version 0.1.0 has been tested on a real inverter installation. After
-all repository checks pass, it can be submitted to the HACS default repository
-list.
+Every push, and a daily scheduled run, validates the repository with the HACS
+action and Hassfest. A separate workflow imports the integration against the
+latest Home Assistant release to catch breaking changes early. A release is
+published automatically when a new version in `manifest.json` reaches `main`
+and validation passes.
+
+The integration is tested on a real installation with a Zonergy Venus6000-S1
+inverter.
 
 ## License
 
