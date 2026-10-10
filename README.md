@@ -89,7 +89,7 @@ counters about once per minute. A self-healing watchdog rebuilds the Bluetooth
 connection after 90 seconds without inverter packets and restarts the ESP32
 only if data still does not resume.
 
-### BLE battery SOC in beta.17
+### BLE battery SOC (0.2.0 and later)
 
 The existing **Zonergy BLE Stato di Carica Batteria** entity reports the mean
 SOC supplied by register `3006`; its name is preserved. The BLE firmware now
@@ -108,7 +108,7 @@ The integration discovers them automatically from the updated firmware.
 
 **Updating through HACS does not flash the ESP32.** To obtain these values:
 
-1. Update the integration to `v0.2.0-beta.17` and restart Home Assistant.
+1. Update the integration to `v0.2.0` or later and restart Home Assistant.
 2. Update the BLE node using
    [`esphome/zonergy-venus-esp32-ble.yaml`](esphome/zonergy-venus-esp32-ble.yaml),
    retaining your node name, Wi-Fi/API settings and personal secrets.
