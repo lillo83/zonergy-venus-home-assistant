@@ -139,6 +139,13 @@ address is `1`.
 
 ## Writable registers
 
+> [!WARNING]
+> The write controls below have **not been tested yet** on a real inverter.
+> Only reading has been verified. There is also no timeout or failsafe: a
+> value written to the inverter stays there until something writes a different
+> one, even if Home Assistant or the gateway goes offline. Use these controls
+> at your own risk and check the result on the inverter display or official app.
+
 | Entity | Register | Range / values |
 |---|---:|---|
 | Charging source: Grid + PV | 2955 | `0` Grid + PV, `1` PV only |
@@ -172,8 +179,9 @@ latest Home Assistant release to catch breaking changes early. A release is
 published automatically when a new version in `manifest.json` reaches `main`
 and validation passes.
 
-The integration is tested on a real installation with a Zonergy Venus6000-S1
-inverter.
+Reading is tested on a real installation with a Zonergy Venus6000-S1
+inverter. The switches and number controls that write to the inverter have not
+been tested yet.
 
 ## License
 
