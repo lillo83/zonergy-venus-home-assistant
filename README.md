@@ -140,8 +140,8 @@ address is `1`.
 ## Writable registers
 
 > [!WARNING]
-> The write controls below have **not been tested yet** on a real inverter.
-> Only reading has been verified. There is also no timeout or failsafe: a
+> The write controls below exist only in ESPHome RS485 mode and have **not
+> been tested yet** on a real inverter. Only reading has been verified. There is also no timeout or failsafe: a
 > value written to the inverter stays there until something writes a different
 > one, even if Home Assistant or the gateway goes offline. Use these controls
 > at your own risk and check the result on the inverter display or official app.
