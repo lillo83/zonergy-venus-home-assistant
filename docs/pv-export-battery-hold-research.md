@@ -45,3 +45,19 @@ The Venus manual describes TOU grid-first surplus as: PV serves load first, exce
 2. Read-only inspection of settings and compare with app (no save) and inverter LCD.
 3. If evidence establishes a safe reversible procedure, request user consent for a short attended TOU test, logging PV, house load, grid export/import, battery watts and SOC before/during/after, with immediate return to Self Consumption.
 4. Do not claim a 'hold battery SOC' control until charge **and** discharge inhibition are independently proven; if not possible, offer clearly named 'Grid-first surplus (battery may still charge)' instead.
+
+## Successful attended live test — 2026-10-11
+The user **did** apply TOU via the official Zonergy app while away from home, then successfully restored Self Consumption via the same app.
+- In TOU, **Excess PV = Grid connection**; around 14:07 local time: PV 4002 W, load 523 W, grid export 3301 W, battery 0 W, SOC 83%. The screenshots demonstrate zero battery flow **at that instant**.
+- After restoring Self Consumption around 14:10: PV 3948 W, load 424 W, grid exchange 0 W, battery charge ~3172 W.
+- User has only ESP32 BLE gateway installed, not RS485 or an active Zonergy Cloud integration.
+- User's TOU schedule includes a discharge window starting at **18:00**; any future automation MUST restore Self Consumption before this window or inhibit activation overlapping it.
+- Important: the single successful daytime test does **not** prove SOC hold in all weather/loads, during a scheduled discharge window, or across inverter restarts.
+
+## Cloud write research status — 2026-10-11
+- Our existing cloud client can authenticate and POST to `/dsweb/param/readDeviceData` for reads.
+- Public searches did not yield a validated Zonergy-specific cloud write endpoint or its payload/value mapping. Search hits for other brands (Zendure, Solis, GivEnergy) are **not transferable**.
+- Zonergy's public app setup manual documents a grid feed-in power limit, **not** an API for switching Self Consumption and TOU.
+- Therefore do **not** implement a live write button or guess an endpoint.
+- Next engineering milestone: a read-only diagnostic integration flow to identify settings register mapping; separately seek Zonergy vendor API docs, or inspect authorized official-app traffic with credentials and tokens redacted. Obtain explicit consent before any subsequent live control.
+- Desired HA UX after protocol verification: `select` or two guarded buttons with verified current mode, safe schedule constraints, readback confirmation, explicit error state and restoration to Self Consumption.
