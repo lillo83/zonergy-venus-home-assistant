@@ -29,3 +29,19 @@ No switches, automations, cloud write requests, or BLE firmware changes until ve
 - Official manual listing: https://www.zonergy.com/it/scaricare/manuale-utente-venus-ita-20230705/
 - English manual transcription (TOU and full feed-in behaviors): https://www.scribd.com/document/631811477/Venus-User-Manual-EN
 - Integration cloud API: https://github.com/lillo83/zonergy-venus-home-assistant/blob/main/custom_components/zonergy_venus/cloud_api.py
+
+## Evidence from app screenshots (October 2026)
+- TOU enables **Excess PV production** picker: **Battery charge** vs **Grid connection**; **Grid connection** was already selected in the unconfirmed TOU editor.
+- Charge source picker: **Grid and PV** vs **PV**; Grid and PV selected in the unconfirmed editor.
+- Charge power field: current 500, permitted 100–5000 (UI erroneously labels percentages); **zero is not accepted**. This parameter cannot be used as a verified charge-off switch.
+- Two sets of charging and discharging time windows visible (defaults 01:00–03:00 charging, 18:00–23:00 discharging); do not assume these schedules are active in Self Consumption.
+- User only selected TOU and Remote Mode locally in the editor; **never pressed Confirm**, so there is no evidence the live inverter work mode changed.
+
+## Manual behavioral nuance
+The Venus manual describes TOU grid-first surplus as: PV serves load first, excess feeds grid first, with any excess above the inverter's output capacity potentially charging batteries. Outside discharge windows, battery is not discharged; grid supplies shortfall. Thus **grid-first does not imply charge inhibition or absolute SOC hold**.
+
+## Safe next steps
+1. Obtain firmware-specific work-mode, TOU PV-surplus-priority and schedule register mapping from Zonergy documentation/support or read-only authenticated API responses; do not guess values.
+2. Read-only inspection of settings and compare with app (no save) and inverter LCD.
+3. If evidence establishes a safe reversible procedure, request user consent for a short attended TOU test, logging PV, house load, grid export/import, battery watts and SOC before/during/after, with immediate return to Self Consumption.
+4. Do not claim a 'hold battery SOC' control until charge **and** discharge inhibition are independently proven; if not possible, offer clearly named 'Grid-first surplus (battery may still charge)' instead.
