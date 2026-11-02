@@ -8,7 +8,7 @@ esphome:
   friendly_name: Inverter Energia
   project:
     name: lillo83.zonergy_venus
-    version: "0.1.1"
+    version: "0.1.2"
 
 esp8266:
   board: d1_mini
@@ -52,6 +52,23 @@ uart:
   parity: NONE
   stop_bits: 1
   rx_buffer_size: 512
+  # Ascolto passivo: sul bus RS485 c'è anche il dongle Wi-Fi originale.
+  # Registra nel log (WARN, tag "sniff") ogni frame di scrittura multipla
+  # (function 16 = 0x10) che passa sulla linea. Non trasmette nulla.
+  debug:
+    direction: RX
+    dummy_receiver: false
+    after:
+      timeout: 10ms
+    sequence:
+      - lambda: |-
+          for (size_t i = 0; i + 1 < bytes.size(); i++) {
+            if (bytes[i] == 0x01 && bytes[i + 1] == 0x10) {
+              ESP_LOGW("sniff", "FC16 (%u byte): %s", (unsigned) bytes.size(),
+                       format_hex_pretty(bytes).c_str());
+              break;
+            }
+          }
 
 modbus:
   id: modbus1
@@ -714,12 +731,12 @@ sensor:
   # -------------------- FINESTRA DI CARICA (2728-2735, SOLO LETTURA) --------------------
   # Valori grezzi per capire la struttura del blocco (ore/minuti inizio/fine).
   # Cambia l'orario di carica dall'app Zonergy e guarda quale registro cambia.
-  # Se restano tutti "Sconosciuto", cambia register_type da holding a read.
+  # L'inverter rifiuta la lettura con function 3 (holding): si leggono con function 4.
   - platform: modbus_controller
     modbus_controller_id: inverter
     name: "Reg 2728"
     entity_category: diagnostic
-    register_type: holding
+    register_type: read
     address: 2728
     value_type: U_WORD
     accuracy_decimals: 0
@@ -728,7 +745,7 @@ sensor:
     modbus_controller_id: inverter
     name: "Reg 2729"
     entity_category: diagnostic
-    register_type: holding
+    register_type: read
     address: 2729
     value_type: U_WORD
     accuracy_decimals: 0
@@ -737,7 +754,7 @@ sensor:
     modbus_controller_id: inverter
     name: "Reg 2730"
     entity_category: diagnostic
-    register_type: holding
+    register_type: read
     address: 2730
     value_type: U_WORD
     accuracy_decimals: 0
@@ -746,7 +763,7 @@ sensor:
     modbus_controller_id: inverter
     name: "Reg 2731"
     entity_category: diagnostic
-    register_type: holding
+    register_type: read
     address: 2731
     value_type: U_WORD
     accuracy_decimals: 0
@@ -755,7 +772,7 @@ sensor:
     modbus_controller_id: inverter
     name: "Reg 2732"
     entity_category: diagnostic
-    register_type: holding
+    register_type: read
     address: 2732
     value_type: U_WORD
     accuracy_decimals: 0
@@ -764,7 +781,7 @@ sensor:
     modbus_controller_id: inverter
     name: "Reg 2733"
     entity_category: diagnostic
-    register_type: holding
+    register_type: read
     address: 2733
     value_type: U_WORD
     accuracy_decimals: 0
@@ -773,7 +790,7 @@ sensor:
     modbus_controller_id: inverter
     name: "Reg 2734"
     entity_category: diagnostic
-    register_type: holding
+    register_type: read
     address: 2734
     value_type: U_WORD
     accuracy_decimals: 0
@@ -782,7 +799,7 @@ sensor:
     modbus_controller_id: inverter
     name: "Reg 2735"
     entity_category: diagnostic
-    register_type: holding
+    register_type: read
     address: 2735
     value_type: U_WORD
     accuracy_decimals: 0
