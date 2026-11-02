@@ -1,9 +1,14 @@
+substitutions:
+  # Durata massima della carica forzata: allo scadere l'ESP la spegne da solo,
+  # anche se Home Assistant non è raggiungibile.
+  forza_carica_max_minuti: "120"
+
 esphome:
   name: inverter-esp
   friendly_name: Inverter Energia
   project:
     name: lillo83.zonergy_venus
-    version: "0.1.0"
+    version: "0.1.1"
 
 esp8266:
   board: d1_mini
@@ -17,6 +22,17 @@ api:
   # api_encryption_key in secrets.yaml. Inserisci poi la stessa chiave in HA.
   # encryption:
   #   key: !secret api_encryption_key
+  # Failsafe: se Home Assistant si disconnette, la carica forzata viene spenta
+  # dall'ESP stesso (scrive solo 0 sul registro 2956).
+  on_client_disconnected:
+    - if:
+        condition:
+          switch.is_on: forza_carica
+        then:
+          - logger.log:
+              level: WARN
+              format: "HA disconnesso: spengo la carica forzata"
+          - switch.turn_off: forza_carica
 
 ota:
   - platform: esphome
@@ -695,6 +711,82 @@ sensor:
     address: 2302
     value_type: S_WORD
 
+  # -------------------- FINESTRA DI CARICA (2728-2735, SOLO LETTURA) --------------------
+  # Valori grezzi per capire la struttura del blocco (ore/minuti inizio/fine).
+  # Cambia l'orario di carica dall'app Zonergy e guarda quale registro cambia.
+  # Se restano tutti "Sconosciuto", cambia register_type da holding a read.
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Reg 2728"
+    entity_category: diagnostic
+    register_type: holding
+    address: 2728
+    value_type: U_WORD
+    accuracy_decimals: 0
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Reg 2729"
+    entity_category: diagnostic
+    register_type: holding
+    address: 2729
+    value_type: U_WORD
+    accuracy_decimals: 0
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Reg 2730"
+    entity_category: diagnostic
+    register_type: holding
+    address: 2730
+    value_type: U_WORD
+    accuracy_decimals: 0
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Reg 2731"
+    entity_category: diagnostic
+    register_type: holding
+    address: 2731
+    value_type: U_WORD
+    accuracy_decimals: 0
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Reg 2732"
+    entity_category: diagnostic
+    register_type: holding
+    address: 2732
+    value_type: U_WORD
+    accuracy_decimals: 0
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Reg 2733"
+    entity_category: diagnostic
+    register_type: holding
+    address: 2733
+    value_type: U_WORD
+    accuracy_decimals: 0
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Reg 2734"
+    entity_category: diagnostic
+    register_type: holding
+    address: 2734
+    value_type: U_WORD
+    accuracy_decimals: 0
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    name: "Reg 2735"
+    entity_category: diagnostic
+    register_type: holding
+    address: 2735
+    value_type: U_WORD
+    accuracy_decimals: 0
+
 # =========================================================
 # TEMPLATE (segni potenza + energie giornaliere)
 # =========================================================
@@ -832,6 +924,23 @@ switch:
     write_lambda: |-
       // 1 = Carica forzata | 0 = Disattiva
       return x ? 1 : 0;
+    on_turn_on:
+      - script.execute: timeout_carica_forzata
+    on_turn_off:
+      - script.stop: timeout_carica_forzata
+
+# =========================================================
+# SCRIPT (failsafe carica forzata)
+# =========================================================
+script:
+  - id: timeout_carica_forzata
+    mode: restart
+    then:
+      - delay: ${forza_carica_max_minuti}min
+      - logger.log:
+          level: WARN
+          format: "Tempo massimo raggiunto: spengo la carica forzata"
+      - switch.turn_off: forza_carica
 
 # =========================================================
 # NUMBER (scrittura)
