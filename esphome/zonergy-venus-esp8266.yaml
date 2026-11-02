@@ -8,7 +8,7 @@ esphome:
   friendly_name: Inverter Energia
   project:
     name: lillo83.zonergy_venus
-    version: "0.1.2"
+    version: "0.1.3"
 
 esp8266:
   board: d1_mini
@@ -728,81 +728,138 @@ sensor:
     address: 2302
     value_type: S_WORD
 
-  # -------------------- FINESTRA DI CARICA (2728-2735, SOLO LETTURA) --------------------
-  # Valori grezzi per capire la struttura del blocco (ore/minuti inizio/fine).
-  # Cambia l'orario di carica dall'app Zonergy e guarda quale registro cambia.
-  # L'inverter rifiuta la lettura con function 3 (holding): si leggono con function 4.
+  # -------------------- FASCE ORARIE CARICA/SCARICA (2728-2743, SOLO LETTURA) --------------------
+  # Ogni orario occupa 2 registri: ora e minuti, ciascuno come 2 caratteri ASCII
+  # (es. 0x3031 = "01"). L'inverter accetta solo la lettura con function 4.
+  # 2728-2735 = periodo 1 (confermato con l'app), 2736-2743 = periodo 2 (da verificare).
+  # Valori grezzi interni: in Home Assistant compaiono i sensori di testo "HH:MM".
   - platform: modbus_controller
     modbus_controller_id: inverter
-    name: "Reg 2728"
-    entity_category: diagnostic
+    id: r2728
+    internal: true
     register_type: read
     address: 2728
     value_type: U_WORD
-    accuracy_decimals: 0
 
   - platform: modbus_controller
     modbus_controller_id: inverter
-    name: "Reg 2729"
-    entity_category: diagnostic
+    id: r2729
+    internal: true
     register_type: read
     address: 2729
     value_type: U_WORD
-    accuracy_decimals: 0
 
   - platform: modbus_controller
     modbus_controller_id: inverter
-    name: "Reg 2730"
-    entity_category: diagnostic
+    id: r2730
+    internal: true
     register_type: read
     address: 2730
     value_type: U_WORD
-    accuracy_decimals: 0
 
   - platform: modbus_controller
     modbus_controller_id: inverter
-    name: "Reg 2731"
-    entity_category: diagnostic
+    id: r2731
+    internal: true
     register_type: read
     address: 2731
     value_type: U_WORD
-    accuracy_decimals: 0
 
   - platform: modbus_controller
     modbus_controller_id: inverter
-    name: "Reg 2732"
-    entity_category: diagnostic
+    id: r2732
+    internal: true
     register_type: read
     address: 2732
     value_type: U_WORD
-    accuracy_decimals: 0
 
   - platform: modbus_controller
     modbus_controller_id: inverter
-    name: "Reg 2733"
-    entity_category: diagnostic
+    id: r2733
+    internal: true
     register_type: read
     address: 2733
     value_type: U_WORD
-    accuracy_decimals: 0
 
   - platform: modbus_controller
     modbus_controller_id: inverter
-    name: "Reg 2734"
-    entity_category: diagnostic
+    id: r2734
+    internal: true
     register_type: read
     address: 2734
     value_type: U_WORD
-    accuracy_decimals: 0
 
   - platform: modbus_controller
     modbus_controller_id: inverter
-    name: "Reg 2735"
-    entity_category: diagnostic
+    id: r2735
+    internal: true
     register_type: read
     address: 2735
     value_type: U_WORD
-    accuracy_decimals: 0
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    id: r2736
+    internal: true
+    register_type: read
+    address: 2736
+    value_type: U_WORD
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    id: r2737
+    internal: true
+    register_type: read
+    address: 2737
+    value_type: U_WORD
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    id: r2738
+    internal: true
+    register_type: read
+    address: 2738
+    value_type: U_WORD
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    id: r2739
+    internal: true
+    register_type: read
+    address: 2739
+    value_type: U_WORD
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    id: r2740
+    internal: true
+    register_type: read
+    address: 2740
+    value_type: U_WORD
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    id: r2741
+    internal: true
+    register_type: read
+    address: 2741
+    value_type: U_WORD
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    id: r2742
+    internal: true
+    register_type: read
+    address: 2742
+    value_type: U_WORD
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    id: r2743
+    internal: true
+    register_type: read
+    address: 2743
+    value_type: U_WORD
 
 # =========================================================
 # TEMPLATE (segni potenza + energie giornaliere)
@@ -1007,6 +1064,134 @@ text_sensor:
       if (s == 7) return {"Autotest"};
       return {"Sconosciuto"};
     update_interval: 10s
+
+  - platform: template
+    name: "Inizio Carica 1"
+    icon: mdi:clock-outline
+    entity_category: diagnostic
+    update_interval: 10s
+    lambda: |-
+      float h = id(r2728).state, m = id(r2729).state;
+      if (isnan(h) || isnan(m)) return {"Sconosciuto"};
+      int hv = (int) h, mv = (int) m;
+      char buf[6] = { (char) (hv >> 8), (char) (hv & 0xFF), ':',
+                      (char) (mv >> 8), (char) (mv & 0xFF), 0 };
+      for (int i = 0; i < 5; i++) {
+        if (i != 2 && (buf[i] < '0' || buf[i] > '9')) return {"Non valido"};
+      }
+      return {std::string(buf)};
+
+  - platform: template
+    name: "Fine Carica 1"
+    icon: mdi:clock-outline
+    entity_category: diagnostic
+    update_interval: 10s
+    lambda: |-
+      float h = id(r2730).state, m = id(r2731).state;
+      if (isnan(h) || isnan(m)) return {"Sconosciuto"};
+      int hv = (int) h, mv = (int) m;
+      char buf[6] = { (char) (hv >> 8), (char) (hv & 0xFF), ':',
+                      (char) (mv >> 8), (char) (mv & 0xFF), 0 };
+      for (int i = 0; i < 5; i++) {
+        if (i != 2 && (buf[i] < '0' || buf[i] > '9')) return {"Non valido"};
+      }
+      return {std::string(buf)};
+
+  - platform: template
+    name: "Inizio Scarica 1"
+    icon: mdi:clock-outline
+    entity_category: diagnostic
+    update_interval: 10s
+    lambda: |-
+      float h = id(r2732).state, m = id(r2733).state;
+      if (isnan(h) || isnan(m)) return {"Sconosciuto"};
+      int hv = (int) h, mv = (int) m;
+      char buf[6] = { (char) (hv >> 8), (char) (hv & 0xFF), ':',
+                      (char) (mv >> 8), (char) (mv & 0xFF), 0 };
+      for (int i = 0; i < 5; i++) {
+        if (i != 2 && (buf[i] < '0' || buf[i] > '9')) return {"Non valido"};
+      }
+      return {std::string(buf)};
+
+  - platform: template
+    name: "Fine Scarica 1"
+    icon: mdi:clock-outline
+    entity_category: diagnostic
+    update_interval: 10s
+    lambda: |-
+      float h = id(r2734).state, m = id(r2735).state;
+      if (isnan(h) || isnan(m)) return {"Sconosciuto"};
+      int hv = (int) h, mv = (int) m;
+      char buf[6] = { (char) (hv >> 8), (char) (hv & 0xFF), ':',
+                      (char) (mv >> 8), (char) (mv & 0xFF), 0 };
+      for (int i = 0; i < 5; i++) {
+        if (i != 2 && (buf[i] < '0' || buf[i] > '9')) return {"Non valido"};
+      }
+      return {std::string(buf)};
+
+  - platform: template
+    name: "Inizio Carica 2"
+    icon: mdi:clock-outline
+    entity_category: diagnostic
+    update_interval: 10s
+    lambda: |-
+      float h = id(r2736).state, m = id(r2737).state;
+      if (isnan(h) || isnan(m)) return {"Sconosciuto"};
+      int hv = (int) h, mv = (int) m;
+      char buf[6] = { (char) (hv >> 8), (char) (hv & 0xFF), ':',
+                      (char) (mv >> 8), (char) (mv & 0xFF), 0 };
+      for (int i = 0; i < 5; i++) {
+        if (i != 2 && (buf[i] < '0' || buf[i] > '9')) return {"Non valido"};
+      }
+      return {std::string(buf)};
+
+  - platform: template
+    name: "Fine Carica 2"
+    icon: mdi:clock-outline
+    entity_category: diagnostic
+    update_interval: 10s
+    lambda: |-
+      float h = id(r2738).state, m = id(r2739).state;
+      if (isnan(h) || isnan(m)) return {"Sconosciuto"};
+      int hv = (int) h, mv = (int) m;
+      char buf[6] = { (char) (hv >> 8), (char) (hv & 0xFF), ':',
+                      (char) (mv >> 8), (char) (mv & 0xFF), 0 };
+      for (int i = 0; i < 5; i++) {
+        if (i != 2 && (buf[i] < '0' || buf[i] > '9')) return {"Non valido"};
+      }
+      return {std::string(buf)};
+
+  - platform: template
+    name: "Inizio Scarica 2"
+    icon: mdi:clock-outline
+    entity_category: diagnostic
+    update_interval: 10s
+    lambda: |-
+      float h = id(r2740).state, m = id(r2741).state;
+      if (isnan(h) || isnan(m)) return {"Sconosciuto"};
+      int hv = (int) h, mv = (int) m;
+      char buf[6] = { (char) (hv >> 8), (char) (hv & 0xFF), ':',
+                      (char) (mv >> 8), (char) (mv & 0xFF), 0 };
+      for (int i = 0; i < 5; i++) {
+        if (i != 2 && (buf[i] < '0' || buf[i] > '9')) return {"Non valido"};
+      }
+      return {std::string(buf)};
+
+  - platform: template
+    name: "Fine Scarica 2"
+    icon: mdi:clock-outline
+    entity_category: diagnostic
+    update_interval: 10s
+    lambda: |-
+      float h = id(r2742).state, m = id(r2743).state;
+      if (isnan(h) || isnan(m)) return {"Sconosciuto"};
+      int hv = (int) h, mv = (int) m;
+      char buf[6] = { (char) (hv >> 8), (char) (hv & 0xFF), ':',
+                      (char) (mv >> 8), (char) (mv & 0xFF), 0 };
+      for (int i = 0; i < 5; i++) {
+        if (i != 2 && (buf[i] < '0' || buf[i] > '9')) return {"Non valido"};
+      }
+      return {std::string(buf)};
 
   
 # =========================================================
