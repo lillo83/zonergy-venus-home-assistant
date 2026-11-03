@@ -20,7 +20,7 @@ CONNECTION_CLOUD: Final = "cloud"
 CLOUD_BASE_URL: Final = "https://zonergy.vidagrid.com"
 CLOUD_SCAN_INTERVAL: Final = 60
 
-PLATFORMS: Final = ["sensor", "binary_sensor", "switch", "number"]
+PLATFORMS: Final = ["sensor", "binary_sensor", "switch", "number", "select"]
 
 # These entities identify the companion ESPHome firmware without depending on
 # the node name or its IP address.
