@@ -3,12 +3,37 @@ substitutions:
   # anche se Home Assistant non è raggiungibile.
   forza_carica_max_minuti: "120"
 
+globals:
+  # true mentre "Carica Batteria da Rete" è attiva; sopravvive al riavvio
+  # così, se l'ESP si riavvia durante la carica, rimette Autoconsumo.
+  - id: carica_rete_attiva
+    type: bool
+    restore_value: true
+    initial_value: "false"
+
 esphome:
   name: inverter-esp
   friendly_name: Inverter Energia
   project:
     name: lillo83.zonergy_venus
-    version: "0.1.5"
+    version: "0.1.6"
+  on_boot:
+    priority: -100
+    then:
+      - if:
+          condition:
+            lambda: "return id(carica_rete_attiva);"
+          then:
+            - delay: 10s
+            - logger.log:
+                level: WARN
+                format: "Riavvio durante la carica da rete: rimetto Autoconsumo"
+            - select.set:
+                id: modalita_inverter
+                option: "Autoconsumo"
+            - globals.set:
+                id: carica_rete_attiva
+                value: "false"
 
 esp8266:
   board: d1_mini
@@ -1004,10 +1029,96 @@ switch:
     on_turn_off:
       - script.stop: timeout_carica_forzata
 
+  # -------------------- CARICA DA RETE A COMANDO --------------------
+  # ON: scrive le fasce orarie (2728-2743) "da adesso per la durata scelta",
+  #     con la scarica fuori da quella fascia, poi mette la modalità TOU.
+  # OFF (a mano o allo scadere della durata): rimette Autoconsumo.
+  # Serve "Abilitazione rete elettrica" attiva nell'app Zonergy.
+  - platform: template
+    name: "Carica Batteria da Rete"
+    id: carica_rete
+    icon: mdi:battery-charging-high
+    restore_mode: ALWAYS_OFF
+    turn_on_action:
+      - if:
+          condition:
+            lambda: "return !id(homeassistant_time).now().is_valid();"
+          then:
+            - logger.log:
+                level: ERROR
+                format: "Ora non disponibile: carica da rete non avviata"
+          else:
+            - lambda: |-
+                auto t = id(homeassistant_time).now();
+                const int FINE = 23 * 60 + 59;
+                int dur = (int) roundf(id(durata_carica_rete).state * 60.0f);
+                int s = t.hour * 60 + t.minute;
+                int e = s + dur;
+                int c1s, c1e, c2s, c2e, ds, de;
+                if (e <= FINE + 1) {
+                  // Tutto nello stesso giorno: periodo 1 e 2 uguali.
+                  c1s = s; c1e = (e > FINE) ? FINE : e;
+                  c2s = c1s; c2e = c1e;
+                  if (c1e < FINE) { ds = c1e; de = FINE; } else { ds = 0; de = c1s; }
+                } else {
+                  // Passa la mezzanotte: periodo 1 fino alle 23:59, periodo 2 da 00:00.
+                  c1s = s; c1e = FINE;
+                  c2s = 0; c2e = e - 24 * 60;
+                  ds = c2e; de = s;
+                }
+                auto ascii2 = [](int n) -> uint16_t {
+                  return (uint16_t) ((('0' + n / 10) << 8) | ('0' + n % 10));
+                };
+                auto blocco = [&](int cs, int ce) {
+                  std::vector<uint16_t> v;
+                  for (int x : {cs, ce, ds, de}) {
+                    v.push_back(ascii2(x / 60));
+                    v.push_back(ascii2(x % 60));
+                  }
+                  return v;
+                };
+                id(inverter)->queue_command(
+                    modbus_controller::ModbusCommandItem::create_write_multiple_command(
+                        id(inverter), 2728, 8, blocco(c1s, c1e)));
+                id(inverter)->queue_command(
+                    modbus_controller::ModbusCommandItem::create_write_multiple_command(
+                        id(inverter), 2736, 8, blocco(c2s, c2e)));
+                ESP_LOGW("carica_rete", "Carica %02d:%02d-%02d:%02d / %02d:%02d-%02d:%02d, scarica %02d:%02d-%02d:%02d",
+                         c1s / 60, c1s % 60, c1e / 60, c1e % 60, c2s / 60, c2s % 60,
+                         c2e / 60, c2e % 60, ds / 60, ds % 60, de / 60, de % 60);
+                id(carica_rete_attiva) = true;
+            - select.set:
+                id: modalita_inverter
+                option: "TOU"
+            - switch.template.publish:
+                id: carica_rete
+                state: ON
+            - script.execute: fine_carica_rete
+    turn_off_action:
+      - script.stop: fine_carica_rete
+      - select.set:
+          id: modalita_inverter
+          option: "Autoconsumo"
+      - globals.set:
+          id: carica_rete_attiva
+          value: "false"
+      - switch.template.publish:
+          id: carica_rete
+          state: OFF
+
 # =========================================================
 # SCRIPT (failsafe carica forzata)
 # =========================================================
 script:
+  - id: fine_carica_rete
+    mode: restart
+    then:
+      - delay: !lambda "return (uint32_t) (id(durata_carica_rete).state * 3600000.0f);"
+      - logger.log:
+          level: WARN
+          format: "Durata raggiunta: fermo la carica da rete"
+      - switch.turn_off: carica_rete
+
   - id: timeout_carica_forzata
     mode: restart
     then:
@@ -1046,6 +1157,19 @@ select:
 # NUMBER (scrittura)
 # =========================================================
 number:
+  - platform: template
+    name: "Durata Carica da Rete"
+    id: durata_carica_rete
+    icon: mdi:timer-outline
+    unit_of_measurement: "h"
+    min_value: 0.5
+    max_value: 8
+    step: 0.5
+    initial_value: 2
+    optimistic: true
+    restore_value: true
+    mode: box
+
   - platform: modbus_controller
     modbus_controller_id: inverter
     name: "Potenza Carica Forzata"
