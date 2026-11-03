@@ -16,7 +16,7 @@ esphome:
   friendly_name: Inverter Energia
   project:
     name: lillo83.zonergy_venus
-    version: "0.1.6"
+    version: "0.1.7"
   on_boot:
     priority: -100
     then:
@@ -77,24 +77,6 @@ uart:
   parity: NONE
   stop_bits: 1
   rx_buffer_size: 512
-  # Ascolto passivo: sul bus RS485 c'è anche il dongle Wi-Fi originale.
-  # Registra nel log (WARN, tag "sniff") ogni frame di scrittura che passa
-  # sulla linea: singola (function 6 = 0x06) e multipla (function 16 = 0x10).
-  # Non trasmette nulla.
-  debug:
-    direction: RX
-    dummy_receiver: false
-    after:
-      timeout: 10ms
-    sequence:
-      - lambda: |-
-          for (size_t i = 0; i + 1 < bytes.size(); i++) {
-            if (bytes[i] == 0x01 && (bytes[i + 1] == 0x10 || bytes[i + 1] == 0x06)) {
-              ESP_LOGW("sniff", "FC%02u (%u byte): %s", (unsigned) bytes[i + 1],
-                       (unsigned) bytes.size(), format_hex_pretty(bytes).c_str());
-              break;
-            }
-          }
 
 modbus:
   id: modbus1
@@ -1048,45 +1030,12 @@ switch:
                 level: ERROR
                 format: "Ora non disponibile: carica da rete non avviata"
           else:
-            - lambda: |-
-                auto t = id(homeassistant_time).now();
-                const int FINE = 23 * 60 + 59;
-                int dur = (int) roundf(id(durata_carica_rete).state * 60.0f);
-                int s = t.hour * 60 + t.minute;
-                int e = s + dur;
-                int c1s, c1e, c2s, c2e, ds, de;
-                if (e <= FINE + 1) {
-                  // Tutto nello stesso giorno: periodo 1 e 2 uguali.
-                  c1s = s; c1e = (e > FINE) ? FINE : e;
-                  c2s = c1s; c2e = c1e;
-                  if (c1e < FINE) { ds = c1e; de = FINE; } else { ds = 0; de = c1s; }
-                } else {
-                  // Passa la mezzanotte: periodo 1 fino alle 23:59, periodo 2 da 00:00.
-                  c1s = s; c1e = FINE;
-                  c2s = 0; c2e = e - 24 * 60;
-                  ds = c2e; de = s;
-                }
-                auto ascii2 = [](int n) -> uint16_t {
-                  return (uint16_t) ((('0' + n / 10) << 8) | ('0' + n % 10));
-                };
-                auto blocco = [&](int cs, int ce) {
-                  std::vector<uint16_t> v;
-                  for (int x : {cs, ce, ds, de}) {
-                    v.push_back(ascii2(x / 60));
-                    v.push_back(ascii2(x % 60));
-                  }
-                  return v;
-                };
-                id(inverter)->queue_command(
-                    modbus_controller::ModbusCommandItem::create_write_multiple_command(
-                        id(inverter), 2728, 8, blocco(c1s, c1e)));
-                id(inverter)->queue_command(
-                    modbus_controller::ModbusCommandItem::create_write_multiple_command(
-                        id(inverter), 2736, 8, blocco(c2s, c2e)));
-                ESP_LOGW("carica_rete", "Carica %02d:%02d-%02d:%02d / %02d:%02d-%02d:%02d, scarica %02d:%02d-%02d:%02d",
-                         c1s / 60, c1s % 60, c1e / 60, c1e % 60, c2s / 60, c2s % 60,
-                         c2e / 60, c2e % 60, ds / 60, ds % 60, de / 60, de % 60);
-                id(carica_rete_attiva) = true;
+            # Scrive le fasce due volte: sul bus c'è anche il dongle Wi-Fi
+            # e una scrittura può andare persa. Scrivere due volte è innocuo.
+            - script.execute: scrivi_fasce_carica
+            - delay: 5s
+            - script.execute: scrivi_fasce_carica
+            - delay: 5s
             - select.set:
                 id: modalita_inverter
                 option: "TOU"
@@ -1110,6 +1059,49 @@ switch:
 # SCRIPT (failsafe carica forzata)
 # =========================================================
 script:
+  - id: scrivi_fasce_carica
+    mode: single
+    then:
+        - lambda: |-
+            auto t = id(homeassistant_time).now();
+            const int FINE = 23 * 60 + 59;
+            int dur = (int) roundf(id(durata_carica_rete).state * 60.0f);
+            int s = t.hour * 60 + t.minute;
+            int e = s + dur;
+            int c1s, c1e, c2s, c2e, ds, de;
+            if (e <= FINE + 1) {
+              // Tutto nello stesso giorno: periodo 1 e 2 uguali.
+              c1s = s; c1e = (e > FINE) ? FINE : e;
+              c2s = c1s; c2e = c1e;
+              if (c1e < FINE) { ds = c1e; de = FINE; } else { ds = 0; de = c1s; }
+            } else {
+              // Passa la mezzanotte: periodo 1 fino alle 23:59, periodo 2 da 00:00.
+              c1s = s; c1e = FINE;
+              c2s = 0; c2e = e - 24 * 60;
+              ds = c2e; de = s;
+            }
+            auto ascii2 = [](int n) -> uint16_t {
+              return (uint16_t) ((('0' + n / 10) << 8) | ('0' + n % 10));
+            };
+            auto blocco = [&](int cs, int ce) {
+              std::vector<uint16_t> v;
+              for (int x : {cs, ce, ds, de}) {
+                v.push_back(ascii2(x / 60));
+                v.push_back(ascii2(x % 60));
+              }
+              return v;
+            };
+            id(inverter)->queue_command(
+                modbus_controller::ModbusCommandItem::create_write_multiple_command(
+                    id(inverter), 2728, 8, blocco(c1s, c1e)));
+            id(inverter)->queue_command(
+                modbus_controller::ModbusCommandItem::create_write_multiple_command(
+                    id(inverter), 2736, 8, blocco(c2s, c2e)));
+            ESP_LOGW("carica_rete", "Carica %02d:%02d-%02d:%02d / %02d:%02d-%02d:%02d, scarica %02d:%02d-%02d:%02d",
+                     c1s / 60, c1s % 60, c1e / 60, c1e % 60, c2s / 60, c2s % 60,
+                     c2e / 60, c2e % 60, ds / 60, ds % 60, de / 60, de % 60);
+            id(carica_rete_attiva) = true;
+
   - id: fine_carica_rete
     mode: restart
     then:
