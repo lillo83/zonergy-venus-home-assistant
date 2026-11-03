@@ -4,11 +4,12 @@
 # Variante per chi legge già i dati dell'inverter con l'ESP32 Bluetooth
 # (zonergy-venus-esp32-ble.yaml). Questo ESP8266 non legge le misure:
 # legge solo le fasce orarie (2728-2743) e comanda la carica dalla rete,
-# la modalità (Autoconsumo/TOU) e la potenza di carica.
-# Meno traffico sul bus RS485, che è condiviso con il dongle Wi-Fi originale.
+# l'immissione del FV in rete, la modalità (Autoconsumo/TOU) e la potenza
+# di carica. Meno traffico sul bus RS485, condiviso con il dongle Wi-Fi.
 #
 # Si usa con l'integrazione ESPHome nativa di Home Assistant: non contiene le
 # misure che l'integrazione Zonergy Venus usa per riconoscere il gateway RS485.
+# Generato da zonergy-venus-esp8266.yaml: le modifiche vanno fatte lì.
 # =========================================================
 substitutions:
   # Durata massima della carica forzata: allo scadere l'ESP la spegne da solo,
@@ -27,6 +28,11 @@ globals:
     type: bool
     restore_value: true
     initial_value: "true"
+  # Quale fascia scrivere: 1 = carica da rete da adesso, 2 = immissione FV
+  # (nessuna carica né scarica nelle ore di giorno).
+  - id: fasce_modo
+    type: int
+    initial_value: "1"
   # Fasce attese dopo una scrittura (16 registri 2728-2743), per la verifica.
   - id: fasce_attese
     type: std::vector<uint16_t>
@@ -43,6 +49,9 @@ esphome:
       - switch.template.publish:
           id: carica_rete
           state: OFF
+      - switch.template.publish:
+          id: immissione_fv
+          state: OFF
       - if:
           condition:
             lambda: "return id(carica_rete_attiva);"
@@ -50,7 +59,7 @@ esphome:
             - delay: 10s
             - logger.log:
                 level: WARN
-                format: "Riavvio durante la carica da rete: rimetto Autoconsumo"
+                format: "Riavvio durante carica da rete o immissione FV: rimetto Autoconsumo"
             - select.set:
                 id: modalita_inverter
                 option: "Autoconsumo"
@@ -329,6 +338,14 @@ switch:
                 level: ERROR
                 format: "Ora non disponibile: carica da rete non avviata"
           else:
+            # Ferma un'eventuale immissione in corso senza passare da Autoconsumo.
+            - script.stop: fine_immissione_fv
+            - switch.template.publish:
+                id: immissione_fv
+                state: OFF
+            - globals.set:
+                id: fasce_modo
+                value: "1"
             # Scrive le fasce due volte: sul bus c'è anche il dongle Wi-Fi
             # e una scrittura può andare persa. Scrivere due volte è innocuo.
             - script.execute: scrivi_fasce_carica
@@ -355,6 +372,63 @@ switch:
           id: carica_rete
           state: OFF
 
+  # -------------------- IMMISSIONE FV IN RETE A COMANDO --------------------
+  # ON: mette TOU con le fasce di notte (carica 00:00-06:00, scarica
+  # 22:00-23:59), così di giorno la batteria non carica e non scarica: il FV
+  # alimenta la casa e il resto va in rete. Serve "Eccesso produzione FV =
+  # Connessione alla rete" nell'app Zonergy (verificato l'11/10/2026: 3300 W
+  # immessi con batteria a 0 W). Funziona solo tra le 06:00 e le 22:00.
+  # OFF (a mano, a fine durata o alle 22:00): rimette Autoconsumo.
+  - platform: template
+    name: "Immetti FV in Rete"
+    id: immissione_fv
+    icon: mdi:transmission-tower-export
+    restore_mode: DISABLED
+    turn_on_action:
+      - if:
+          condition:
+            lambda: |-
+              auto t = id(homeassistant_time).now();
+              return !t.is_valid() || t.hour < 6 || t.hour >= 22;
+          then:
+            - logger.log:
+                level: ERROR
+                format: "Immissione FV possibile solo tra le 06:00 e le 22:00 (o ora non disponibile)"
+            - switch.template.publish:
+                id: immissione_fv
+                state: OFF
+          else:
+            - script.stop: fine_carica_rete
+            - switch.template.publish:
+                id: carica_rete
+                state: OFF
+            - globals.set:
+                id: fasce_modo
+                value: "2"
+            - script.execute: scrivi_fasce_carica
+            - delay: 5s
+            - script.execute: scrivi_fasce_carica
+            - delay: 5s
+            - script.execute: verifica_fasce
+            - select.set:
+                id: modalita_inverter
+                option: "TOU"
+            - switch.template.publish:
+                id: immissione_fv
+                state: ON
+            - script.execute: fine_immissione_fv
+    turn_off_action:
+      - script.stop: fine_immissione_fv
+      - select.set:
+          id: modalita_inverter
+          option: "Autoconsumo"
+      - globals.set:
+          id: carica_rete_attiva
+          value: "false"
+      - switch.template.publish:
+          id: immissione_fv
+          state: OFF
+
 # =========================================================
 # SCRIPT (failsafe carica forzata)
 # =========================================================
@@ -369,7 +443,12 @@ script:
             int s = t.hour * 60 + t.minute;
             int e = s + dur;
             int c1s, c1e, c2s, c2e, ds, de;
-            if (e <= FINE + 1) {
+            if (id(fasce_modo) == 2) {
+              // Immissione FV: fasce solo di notte, nessuna fascia di giorno.
+              c1s = 0; c1e = 6 * 60;
+              c2s = c1s; c2e = c1e;
+              ds = 22 * 60; de = FINE;
+            } else if (e <= FINE + 1) {
               // Tutto nello stesso giorno: periodo 1 e 2 uguali.
               c1s = s; c1e = (e > FINE) ? FINE : e;
               c2s = c1s; c2e = c1e;
@@ -406,7 +485,8 @@ script:
             id(inverter)->queue_command(
                 modbus_controller::ModbusCommandItem::create_write_multiple_command(
                     id(inverter), 2728, 16, tutto));
-            ESP_LOGW("carica_rete", "Carica %02d:%02d-%02d:%02d / %02d:%02d-%02d:%02d, scarica %02d:%02d-%02d:%02d",
+            ESP_LOGW("carica_rete", "[%s] Carica %02d:%02d-%02d:%02d / %02d:%02d-%02d:%02d, scarica %02d:%02d-%02d:%02d",
+                     id(fasce_modo) == 2 ? "immissione FV" : "carica da rete",
                      c1s / 60, c1s % 60, c1e / 60, c1e % 60, c2s / 60, c2s % 60,
                      c2e / 60, c2e % 60, ds / 60, ds % 60, de / 60, de % 60);
             id(carica_rete_attiva) = true;
@@ -446,6 +526,22 @@ script:
           level: WARN
           format: "Durata raggiunta: fermo la carica da rete"
       - switch.turn_off: carica_rete
+
+  - id: fine_immissione_fv
+    mode: restart
+    then:
+      # Si ferma a fine durata, e comunque entro le 22:00.
+      - delay: !lambda |-
+          auto t = id(homeassistant_time).now();
+          uint32_t dur = (uint32_t) (id(durata_carica_rete).state * 3600000.0f);
+          if (!t.is_valid()) return dur;
+          int restanti = 22 * 60 - (t.hour * 60 + t.minute);
+          uint32_t fino_22 = restanti > 0 ? (uint32_t) restanti * 60000UL : 0;
+          return dur < fino_22 ? dur : fino_22;
+      - logger.log:
+          level: WARN
+          format: "Fine immissione FV: torno in Autoconsumo"
+      - switch.turn_off: immissione_fv
 
   - id: timeout_carica_forzata
     mode: restart

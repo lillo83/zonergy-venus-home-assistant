@@ -38,8 +38,8 @@ Supported entities:
 - ESP8266/RS485 online status
 - grid/PV charging source and forced-charge switches
 - forced-charge power and grid-charge limit controls
-- charging from the grid on demand, with duration, and the inverter operating
-  mode (self-consumption / TOU)
+- charging from the grid on demand, exporting PV instead of charging the
+  battery on demand, and the inverter operating mode (self-consumption / TOU)
 - charge and discharge periods currently stored in the inverter
 
 ## Requirements
@@ -176,6 +176,16 @@ duration, puts the inverter in TOU mode and, when the time is up or the switch
 is turned off, puts it back in self-consumption. If the ESP8266 restarts during
 a charge, it restores self-consumption at boot. `Esito Scrittura Fasce`
 reports whether the periods were really written.
+
+`Immetti FV in Rete` does the opposite: between 06:00 and 22:00 it puts the
+inverter in TOU with the time slots moved to the night (charge 00:00-06:00,
+discharge 22:00-23:59). During the day the battery then neither charges nor
+discharges: PV supplies the house and the surplus is exported. It stops at the
+end of `Durata Carica da Rete`, at 22:00 at the latest, and restores
+self-consumption. It requires `Eccesso produzione FV = Connessione alla rete`
+in the Zonergy app; in a test on 2026-10-11 the inverter exported 3.3 kW with
+the battery at 0 W. If PV does not cover the house, the shortfall comes from
+the grid, not from the battery.
 
 Requirements and limits:
 

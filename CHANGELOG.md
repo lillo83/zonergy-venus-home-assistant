@@ -13,6 +13,11 @@ unchanged.
     charge window from the current time for the chosen duration, switches the
     inverter to TOU and returns it to self-consumption when the time is up,
     when switched off, or after a restart of the ESP8266
+  - adds `Immetti FV in Rete`: between 06:00 and 22:00 it switches to TOU
+    with the time slots moved to the night, so during the day the battery
+    neither charges nor discharges and the PV surplus goes to the grid; it
+    returns to self-consumption at the end of the duration or at 22:00
+    (requires `Eccesso produzione FV = Connessione alla rete` in the app)
   - adds `Modalità Inverter` (register 2300: 0 = Autoconsumo, 1 = TOU),
     captured from the frames sent by the original Wi-Fi dongle
   - reads the two charge and discharge periods (registers 2728-2743, stored
