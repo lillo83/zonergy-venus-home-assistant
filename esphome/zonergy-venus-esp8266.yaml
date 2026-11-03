@@ -8,7 +8,7 @@ esphome:
   friendly_name: Inverter Energia
   project:
     name: lillo83.zonergy_venus
-    version: "0.1.4"
+    version: "0.1.5"
 
 esp8266:
   board: d1_mini
@@ -1016,6 +1016,31 @@ script:
           level: WARN
           format: "Tempo massimo raggiunto: spengo la carica forzata"
       - switch.turn_off: forza_carica
+
+# =========================================================
+# SELECT (modalità di funzionamento)
+# =========================================================
+# Registro 2300, scritto con function 6 come fa l'app Zonergy
+# (frame catturati: 0 = Autoconsumo, 1 = TOU).
+# Solo scrittura: l'inverter non permette di rileggerlo. Lo stato mostrato
+# è l'ultimo inviato da qui; se cambi modalità dall'app non si aggiorna.
+select:
+  - platform: template
+    name: "Modalità Inverter"
+    id: modalita_inverter
+    icon: mdi:cog-transfer
+    options:
+      - "Autoconsumo"
+      - "TOU"
+    optimistic: true
+    restore_value: true
+    set_action:
+      - lambda: |-
+          uint16_t v = (strcmp(x.c_str(), "TOU") == 0) ? 1 : 0;
+          auto cmd = modbus_controller::ModbusCommandItem::create_write_single_command(
+              id(inverter), 2300, v);
+          id(inverter)->queue_command(cmd);
+          ESP_LOGW("modalita", "Registro 2300 = %u (%s)", v, x.c_str());
 
 # =========================================================
 # NUMBER (scrittura)
