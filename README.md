@@ -5,10 +5,10 @@ ESP8266/ESPHome RS485 gateway, a local ESP32 Bluetooth gateway for the original
 Zonergy Wi-Fi dongle, or the same cloud service used by the official app.
 
 > [!IMPORTANT]
-> Version 0.2.0 adds an experimental, read-only Zonergy Cloud connection. The
-> existing ESPHome mode is unchanged. Its switches and number controls write
-> real values to the inverter, so use them only if their meaning and limits
-> match your inverter model.
+> Version 0.3.0 adds charging from the grid on demand through the ESP8266
+> RS485 gateway (see [Grid charging on demand](#grid-charging-on-demand)).
+> Its switches, numbers and selector write real values to the inverter, so use
+> them only if their meaning and limits match your inverter model.
 
 ## How it works
 
@@ -38,6 +38,9 @@ Supported entities:
 - ESP8266/RS485 online status
 - grid/PV charging source and forced-charge switches
 - forced-charge power and grid-charge limit controls
+- charging from the grid on demand, with duration, and the inverter operating
+  mode (self-consumption / TOU)
+- charge and discharge periods currently stored in the inverter
 
 ## Requirements
 
@@ -159,6 +162,54 @@ If the standard ESPHome integration already manages this node, Home Assistant
 may show two sets of inverter entities. During testing, keep only the set you
 intend to use enabled.
 
+## Grid charging on demand
+
+The ESP8266 firmware can charge the battery from the grid whenever you want,
+without editing time slots in the Zonergy app:
+
+1. set `Durata Carica da Rete` (0.5-8 hours) and `Potenza Carica Forzata`
+   (the charging power, register 2957)
+2. turn on `Carica Batteria da Rete`
+
+The ESP8266 writes a charge window from the current time for the chosen
+duration, puts the inverter in TOU mode and, when the time is up or the switch
+is turned off, puts it back in self-consumption. If the ESP8266 restarts during
+a charge, it restores self-consumption at boot. `Esito Scrittura Fasce`
+reports whether the periods were really written.
+
+Requirements and limits:
+
+- `Abilitazione rete elettrica` (grid charging) must be enabled in the Zonergy
+  app; this setting is not yet controlled by the ESP8266
+- on the tested inverter only period 1 is written; keep period 2 in the app
+  outside the hours you charge on demand, for example charge 00:00-06:00 and
+  discharge 22:00-23:59
+- choose a charging power that your grid connection can supply together with
+  the house load
+
+Registers used, all on Modbus address 1:
+
+| Register | Access | Meaning |
+|---|---|---|
+| 2300 | write (function 6) | Operating mode: 0 = self-consumption, 1 = TOU |
+| 2728-2735 | read (function 4), write (function 16) | Period 1: charge start, charge end, discharge start, discharge end; two registers per time (hours, minutes), each as two ASCII digits, e.g. `0x3031` = `01` |
+| 2736-2743 | read (function 4) | Period 2, same layout |
+| 2957 | write (function 6) | Charging power in W |
+
+The inverter rejects reads of the control registers (2300, 2955, 2956, 2957,
+2962), so these entities show the last value sent from Home Assistant, not a
+value read back from the inverter.
+
+### Controls-only firmware
+
+If you already read the inverter with the ESP32 Bluetooth firmware, flash
+[`esphome/zonergy-venus-esp8266-controlli.yaml`](esphome/zonergy-venus-esp8266-controlli.yaml)
+on the ESP8266 instead of the full firmware. It keeps only the controls above
+and the charge periods, so the RS485 bus, shared with the original Wi-Fi
+dongle, carries much less traffic. Use it with the native ESPHome integration:
+it does not expose the measurements that the Zonergy Venus integration uses to
+recognize an RS485 gateway.
+
 ## Troubleshooting
 
 - Confirm that Home Assistant can reach the ESP8266 on TCP port `6053`.
@@ -180,8 +231,9 @@ published automatically when a new version in `manifest.json` reaches `main`
 and validation passes.
 
 Reading is tested on a real installation with a Zonergy Venus6000-S1
-inverter. The switches and number controls that write to the inverter have not
-been tested yet.
+inverter. On the same inverter, `Carica Batteria da Rete`, `Modalità Inverter`
+and `Potenza Carica Forzata` have been tested; `Forza Carica Batteria`,
+`Limite Carica da Rete` and `Sorgente Carica: Rete + PV` have not.
 
 ## License
 

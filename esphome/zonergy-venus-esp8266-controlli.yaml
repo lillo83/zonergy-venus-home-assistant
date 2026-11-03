@@ -1,0 +1,687 @@
+# =========================================================
+# Zonergy Venus - ESP8266 RS485 SOLO COMANDI
+# =========================================================
+# Variante per chi legge già i dati dell'inverter con l'ESP32 Bluetooth
+# (zonergy-venus-esp32-ble.yaml). Questo ESP8266 non legge le misure:
+# legge solo le fasce orarie (2728-2743) e comanda la carica dalla rete,
+# la modalità (Autoconsumo/TOU) e la potenza di carica.
+# Meno traffico sul bus RS485, che è condiviso con il dongle Wi-Fi originale.
+#
+# Si usa con l'integrazione ESPHome nativa di Home Assistant: non contiene le
+# misure che l'integrazione Zonergy Venus usa per riconoscere il gateway RS485.
+# =========================================================
+substitutions:
+  # Durata massima della carica forzata: allo scadere l'ESP la spegne da solo,
+  # anche se Home Assistant non è raggiungibile.
+  forza_carica_max_minuti: "120"
+
+globals:
+  # true mentre "Carica Batteria da Rete" è attiva; sopravvive al riavvio
+  # così, se l'ESP si riavvia durante la carica, rimette Autoconsumo.
+  - id: carica_rete_attiva
+    type: bool
+    restore_value: true
+    initial_value: "false"
+  # Ultimo valore scelto per "Sorgente Carica: Rete + PV" (registro 2955).
+  - id: sorgente_rete_pv
+    type: bool
+    restore_value: true
+    initial_value: "true"
+  # Fasce attese dopo una scrittura (16 registri 2728-2743), per la verifica.
+  - id: fasce_attese
+    type: std::vector<uint16_t>
+
+esphome:
+  name: inverter-esp
+  friendly_name: Inverter Energia
+  project:
+    name: lillo83.zonergy_venus
+    version: "0.3.0"
+  on_boot:
+    priority: -100
+    then:
+      - switch.template.publish:
+          id: carica_rete
+          state: OFF
+      - if:
+          condition:
+            lambda: "return id(carica_rete_attiva);"
+          then:
+            - delay: 10s
+            - logger.log:
+                level: WARN
+                format: "Riavvio durante la carica da rete: rimetto Autoconsumo"
+            - select.set:
+                id: modalita_inverter
+                option: "Autoconsumo"
+            - globals.set:
+                id: carica_rete_attiva
+                value: "false"
+
+esp8266:
+  board: d1_mini
+
+logger:
+  baud_rate: 0
+  level: WARN
+
+api:
+  # Per usare la crittografia, decommenta queste due righe e aggiungi
+  # api_encryption_key in secrets.yaml. Inserisci poi la stessa chiave in HA.
+  # encryption:
+  #   key: !secret api_encryption_key
+  # Failsafe: se Home Assistant si disconnette, la carica forzata viene spenta
+  # dall'ESP stesso (scrive solo 0 sul registro 2956).
+  on_client_disconnected:
+    - if:
+        condition:
+          switch.is_on: forza_carica
+        then:
+          - logger.log:
+              level: WARN
+              format: "HA disconnesso: spengo la carica forzata"
+          - switch.turn_off: forza_carica
+
+ota:
+  - platform: esphome
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+web_server:
+  port: 80
+
+uart:
+  id: uart_bus
+  tx_pin: GPIO5        # D1 → DI
+  rx_pin: GPIO2        # D4 → RO
+  baud_rate: 115200
+  parity: NONE
+  stop_bits: 1
+  rx_buffer_size: 512
+
+modbus:
+  id: modbus1
+  uart_id: uart_bus
+  flow_control_pin: GPIO4   # D2 = DE+RE
+  send_wait_time: 500ms
+
+modbus_controller:
+  - id: inverter
+    modbus_id: modbus1
+    address: 1
+    update_interval: 15s
+    command_throttle: 1000ms
+    allow_duplicate_commands: false
+    max_cmd_retries: 2
+    offline_skip_updates: 5
+
+# =========================================================
+# SENSORI
+# =========================================================
+sensor:
+  - platform: wifi_signal
+    name: "Segnale Wi-Fi"
+    update_interval: 60s
+
+  # -------------------- FASCE ORARIE CARICA/SCARICA (2728-2743, SOLO LETTURA) --------------------
+  # Ogni orario occupa 2 registri: ora e minuti, ciascuno come 2 caratteri ASCII
+  # (es. 0x3031 = "01"). L'inverter accetta solo la lettura con function 4.
+  # 2728-2735 = periodo 1 (confermato con l'app), 2736-2743 = periodo 2 (da verificare).
+  # Valori grezzi interni: in Home Assistant compaiono i sensori di testo "HH:MM".
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    id: r2728
+    internal: true
+    register_type: read
+    address: 2728
+    value_type: U_WORD
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    id: r2729
+    internal: true
+    register_type: read
+    address: 2729
+    value_type: U_WORD
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    id: r2730
+    internal: true
+    register_type: read
+    address: 2730
+    value_type: U_WORD
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    id: r2731
+    internal: true
+    register_type: read
+    address: 2731
+    value_type: U_WORD
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    id: r2732
+    internal: true
+    register_type: read
+    address: 2732
+    value_type: U_WORD
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    id: r2733
+    internal: true
+    register_type: read
+    address: 2733
+    value_type: U_WORD
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    id: r2734
+    internal: true
+    register_type: read
+    address: 2734
+    value_type: U_WORD
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    id: r2735
+    internal: true
+    register_type: read
+    address: 2735
+    value_type: U_WORD
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    id: r2736
+    internal: true
+    register_type: read
+    address: 2736
+    value_type: U_WORD
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    id: r2737
+    internal: true
+    register_type: read
+    address: 2737
+    value_type: U_WORD
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    id: r2738
+    internal: true
+    register_type: read
+    address: 2738
+    value_type: U_WORD
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    id: r2739
+    internal: true
+    register_type: read
+    address: 2739
+    value_type: U_WORD
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    id: r2740
+    internal: true
+    register_type: read
+    address: 2740
+    value_type: U_WORD
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    id: r2741
+    internal: true
+    register_type: read
+    address: 2741
+    value_type: U_WORD
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    id: r2742
+    internal: true
+    register_type: read
+    address: 2742
+    value_type: U_WORD
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter
+    id: r2743
+    internal: true
+    register_type: read
+    address: 2743
+    value_type: U_WORD
+
+# =========================================================
+# SWITCH (scrittura)
+# =========================================================
+# I registri di comando (2955, 2956, 2957, 2962) non si possono rileggere:
+# l'inverter risponde con eccezione 2. Per questo i comandi sono di sola
+# scrittura e mostrano l'ultimo valore inviato, ricordato anche dopo un riavvio.
+switch:
+  - platform: template
+    name: "Sorgente Carica: Rete + PV"
+    id: sorgente_carica_rete_pv
+    entity_category: config
+    restore_mode: DISABLED
+    lambda: "return id(sorgente_rete_pv);"
+    turn_on_action:
+      # 0 = Rete + PV
+      - lambda: |-
+          id(inverter)->queue_command(
+              modbus_controller::ModbusCommandItem::create_write_single_command(
+                  id(inverter), 2955, 0));
+          id(sorgente_rete_pv) = true;
+    turn_off_action:
+      # 1 = Solo PV
+      - lambda: |-
+          id(inverter)->queue_command(
+              modbus_controller::ModbusCommandItem::create_write_single_command(
+                  id(inverter), 2955, 1));
+          id(sorgente_rete_pv) = false;
+
+  # Sperimentale: in Autoconsumo non ha avviato la carica. Per caricare dalla
+  # rete usa "Carica Batteria da Rete". All'avvio scrive 0 (spenta).
+  - platform: template
+    name: "Forza Carica Batteria"
+    id: forza_carica
+    entity_category: config
+    optimistic: true
+    restore_mode: ALWAYS_OFF
+    turn_on_action:
+      - lambda: |-
+          id(inverter)->queue_command(
+              modbus_controller::ModbusCommandItem::create_write_single_command(
+                  id(inverter), 2956, 1));
+    turn_off_action:
+      - lambda: |-
+          id(inverter)->queue_command(
+              modbus_controller::ModbusCommandItem::create_write_single_command(
+                  id(inverter), 2956, 0));
+    on_turn_on:
+      - script.execute: timeout_carica_forzata
+    on_turn_off:
+      - script.stop: timeout_carica_forzata
+
+  # -------------------- CARICA DA RETE A COMANDO --------------------
+  # ON: scrive le fasce orarie (2728-2743) "da adesso per la durata scelta",
+  #     con la scarica fuori da quella fascia, poi mette la modalità TOU.
+  # OFF (a mano o allo scadere della durata): rimette Autoconsumo.
+  # Serve "Abilitazione rete elettrica" attiva nell'app Zonergy.
+  - platform: template
+    name: "Carica Batteria da Rete"
+    id: carica_rete
+    icon: mdi:battery-charging-high
+    # Nessuna azione all'avvio: lo stato OFF viene pubblicato in on_boot.
+    restore_mode: DISABLED
+    turn_on_action:
+      - if:
+          condition:
+            lambda: "return !id(homeassistant_time).now().is_valid();"
+          then:
+            - logger.log:
+                level: ERROR
+                format: "Ora non disponibile: carica da rete non avviata"
+          else:
+            # Scrive le fasce due volte: sul bus c'è anche il dongle Wi-Fi
+            # e una scrittura può andare persa. Scrivere due volte è innocuo.
+            - script.execute: scrivi_fasce_carica
+            - delay: 5s
+            - script.execute: scrivi_fasce_carica
+            - delay: 5s
+            - script.execute: verifica_fasce
+            - select.set:
+                id: modalita_inverter
+                option: "TOU"
+            - switch.template.publish:
+                id: carica_rete
+                state: ON
+            - script.execute: fine_carica_rete
+    turn_off_action:
+      - script.stop: fine_carica_rete
+      - select.set:
+          id: modalita_inverter
+          option: "Autoconsumo"
+      - globals.set:
+          id: carica_rete_attiva
+          value: "false"
+      - switch.template.publish:
+          id: carica_rete
+          state: OFF
+
+# =========================================================
+# SCRIPT (failsafe carica forzata)
+# =========================================================
+script:
+  - id: scrivi_fasce_carica
+    mode: single
+    then:
+        - lambda: |-
+            auto t = id(homeassistant_time).now();
+            const int FINE = 23 * 60 + 59;
+            int dur = (int) roundf(id(durata_carica_rete).state * 60.0f);
+            int s = t.hour * 60 + t.minute;
+            int e = s + dur;
+            int c1s, c1e, c2s, c2e, ds, de;
+            if (e <= FINE + 1) {
+              // Tutto nello stesso giorno: periodo 1 e 2 uguali.
+              c1s = s; c1e = (e > FINE) ? FINE : e;
+              c2s = c1s; c2e = c1e;
+              if (c1e < FINE) { ds = c1e; de = FINE; } else { ds = 0; de = c1s; }
+            } else {
+              // Passa la mezzanotte: periodo 1 fino alle 23:59, periodo 2 da 00:00.
+              c1s = s; c1e = FINE;
+              c2s = 0; c2e = e - 24 * 60;
+              ds = c2e; de = s;
+            }
+            auto ascii2 = [](int n) -> uint16_t {
+              return (uint16_t) ((('0' + n / 10) << 8) | ('0' + n % 10));
+            };
+            auto blocco = [&](int cs, int ce) {
+              std::vector<uint16_t> v;
+              for (int x : {cs, ce, ds, de}) {
+                v.push_back(ascii2(x / 60));
+                v.push_back(ascii2(x % 60));
+              }
+              return v;
+            };
+            id(inverter)->queue_command(
+                modbus_controller::ModbusCommandItem::create_write_multiple_command(
+                    id(inverter), 2728, 8, blocco(c1s, c1e)));
+            id(inverter)->queue_command(
+                modbus_controller::ModbusCommandItem::create_write_multiple_command(
+                    id(inverter), 2736, 8, blocco(c2s, c2e)));
+            // Tentativo aggiuntivo: periodo 1 e 2 in un solo blocco da 16
+            // registri. Se l'inverter lo rifiuta, il periodo 1 è già scritto.
+            std::vector<uint16_t> tutto = blocco(c1s, c1e);
+            std::vector<uint16_t> p2 = blocco(c2s, c2e);
+            tutto.insert(tutto.end(), p2.begin(), p2.end());
+            id(fasce_attese) = tutto;
+            id(inverter)->queue_command(
+                modbus_controller::ModbusCommandItem::create_write_multiple_command(
+                    id(inverter), 2728, 16, tutto));
+            ESP_LOGW("carica_rete", "Carica %02d:%02d-%02d:%02d / %02d:%02d-%02d:%02d, scarica %02d:%02d-%02d:%02d",
+                     c1s / 60, c1s % 60, c1e / 60, c1e % 60, c2s / 60, c2s % 60,
+                     c2e / 60, c2e % 60, ds / 60, ds % 60, de / 60, de % 60);
+            id(carica_rete_attiva) = true;
+
+  # Controlla che l'inverter abbia davvero le fasce scritte e lo pubblica in
+  # "Esito Scrittura Fasce" (leggibile da Home Assistant, senza log).
+  - id: verifica_fasce
+    mode: restart
+    then:
+      - text_sensor.template.publish:
+          id: esito_fasce
+          state: "Verifica in corso..."
+      - delay: 25s
+      - lambda: |-
+          const auto &att = id(fasce_attese);
+          if (att.size() != 16) return;
+          sensor::Sensor *r[16] = {
+              id(r2728), id(r2729), id(r2730), id(r2731),
+              id(r2732), id(r2733), id(r2734), id(r2735),
+              id(r2736), id(r2737), id(r2738), id(r2739),
+              id(r2740), id(r2741), id(r2742), id(r2743)};
+          bool ok1 = true, ok2 = true;
+          for (int i = 0; i < 16; i++) {
+            bool ok = !isnan(r[i]->state) && (uint16_t) r[i]->state == att[i];
+            if (i < 8) ok1 = ok1 && ok; else ok2 = ok2 && ok;
+          }
+          std::string esito = std::string("Periodo 1 ") + (ok1 ? "OK" : "NON scritto") +
+                              " · Periodo 2 " + (ok2 ? "OK" : "NON scritto");
+          ESP_LOGW("carica_rete", "Verifica fasce: %s", esito.c_str());
+          id(esito_fasce).publish_state(esito);
+
+  - id: fine_carica_rete
+    mode: restart
+    then:
+      - delay: !lambda "return (uint32_t) (id(durata_carica_rete).state * 3600000.0f);"
+      - logger.log:
+          level: WARN
+          format: "Durata raggiunta: fermo la carica da rete"
+      - switch.turn_off: carica_rete
+
+  - id: timeout_carica_forzata
+    mode: restart
+    then:
+      - delay: ${forza_carica_max_minuti}min
+      - logger.log:
+          level: WARN
+          format: "Tempo massimo raggiunto: spengo la carica forzata"
+      - switch.turn_off: forza_carica
+
+# =========================================================
+# SELECT (modalità di funzionamento)
+# =========================================================
+# Registro 2300, scritto con function 6 come fa l'app Zonergy
+# (frame catturati: 0 = Autoconsumo, 1 = TOU).
+# Solo scrittura: l'inverter non permette di rileggerlo. Lo stato mostrato
+# è l'ultimo inviato da qui; se cambi modalità dall'app non si aggiorna.
+select:
+  - platform: template
+    name: "Modalità Inverter"
+    id: modalita_inverter
+    icon: mdi:cog-transfer
+    options:
+      - "Autoconsumo"
+      - "TOU"
+    optimistic: true
+    restore_value: true
+    set_action:
+      - lambda: |-
+          uint16_t v = (strcmp(x.c_str(), "TOU") == 0) ? 1 : 0;
+          auto cmd = modbus_controller::ModbusCommandItem::create_write_single_command(
+              id(inverter), 2300, v);
+          id(inverter)->queue_command(cmd);
+          ESP_LOGW("modalita", "Registro 2300 = %u (%s)", v, x.c_str());
+
+# =========================================================
+# NUMBER (scrittura)
+# =========================================================
+number:
+  - platform: template
+    name: "Durata Carica da Rete"
+    id: durata_carica_rete
+    icon: mdi:timer-outline
+    unit_of_measurement: "h"
+    min_value: 0.5
+    max_value: 8
+    step: 0.5
+    initial_value: 2
+    optimistic: true
+    restore_value: true
+    mode: box
+
+  # Registro 2957 = "Potenza di carica" dell'app Zonergy (verificato:
+  # impostando 1500 W la batteria carica a circa 1500 W).
+  - platform: template
+    name: "Potenza Carica Forzata"
+    id: potenza_carica_forzata
+    icon: mdi:lightning-bolt-outline
+    unit_of_measurement: "W"
+    min_value: 100
+    max_value: 5000
+    step: 50
+    initial_value: 2500
+    optimistic: true
+    restore_value: true
+    mode: box
+    set_action:
+      - lambda: |-
+          id(inverter)->queue_command(
+              modbus_controller::ModbusCommandItem::create_write_single_command(
+                  id(inverter), 2957, (uint16_t) x));
+
+  - platform: template
+    name: "Limite Carica da Rete"
+    id: limite_carica_rete
+    entity_category: config
+    unit_of_measurement: "W"
+    min_value: 0
+    max_value: 5000
+    step: 100
+    initial_value: 0
+    optimistic: true
+    restore_value: true
+    mode: box
+    set_action:
+      - lambda: |-
+          id(inverter)->queue_command(
+              modbus_controller::ModbusCommandItem::create_write_single_command(
+                  id(inverter), 2962, (uint16_t) x));
+
+# =========================================================
+# TEXT SENSOR (stati leggibili)
+# =========================================================
+text_sensor:
+  - platform: template
+    name: "Esito Scrittura Fasce"
+    id: esito_fasce
+    icon: mdi:clipboard-check-outline
+    entity_category: diagnostic
+
+  - platform: template
+    name: "Inizio Carica 1"
+    icon: mdi:clock-outline
+    entity_category: diagnostic
+    update_interval: 10s
+    lambda: |-
+      float h = id(r2728).state, m = id(r2729).state;
+      if (isnan(h) || isnan(m)) return {"Sconosciuto"};
+      int hv = (int) h, mv = (int) m;
+      char buf[6] = { (char) (hv >> 8), (char) (hv & 0xFF), ':',
+                      (char) (mv >> 8), (char) (mv & 0xFF), 0 };
+      for (int i = 0; i < 5; i++) {
+        if (i != 2 && (buf[i] < '0' || buf[i] > '9')) return {"Non valido"};
+      }
+      return {std::string(buf)};
+
+  - platform: template
+    name: "Fine Carica 1"
+    icon: mdi:clock-outline
+    entity_category: diagnostic
+    update_interval: 10s
+    lambda: |-
+      float h = id(r2730).state, m = id(r2731).state;
+      if (isnan(h) || isnan(m)) return {"Sconosciuto"};
+      int hv = (int) h, mv = (int) m;
+      char buf[6] = { (char) (hv >> 8), (char) (hv & 0xFF), ':',
+                      (char) (mv >> 8), (char) (mv & 0xFF), 0 };
+      for (int i = 0; i < 5; i++) {
+        if (i != 2 && (buf[i] < '0' || buf[i] > '9')) return {"Non valido"};
+      }
+      return {std::string(buf)};
+
+  - platform: template
+    name: "Inizio Scarica 1"
+    icon: mdi:clock-outline
+    entity_category: diagnostic
+    update_interval: 10s
+    lambda: |-
+      float h = id(r2732).state, m = id(r2733).state;
+      if (isnan(h) || isnan(m)) return {"Sconosciuto"};
+      int hv = (int) h, mv = (int) m;
+      char buf[6] = { (char) (hv >> 8), (char) (hv & 0xFF), ':',
+                      (char) (mv >> 8), (char) (mv & 0xFF), 0 };
+      for (int i = 0; i < 5; i++) {
+        if (i != 2 && (buf[i] < '0' || buf[i] > '9')) return {"Non valido"};
+      }
+      return {std::string(buf)};
+
+  - platform: template
+    name: "Fine Scarica 1"
+    icon: mdi:clock-outline
+    entity_category: diagnostic
+    update_interval: 10s
+    lambda: |-
+      float h = id(r2734).state, m = id(r2735).state;
+      if (isnan(h) || isnan(m)) return {"Sconosciuto"};
+      int hv = (int) h, mv = (int) m;
+      char buf[6] = { (char) (hv >> 8), (char) (hv & 0xFF), ':',
+                      (char) (mv >> 8), (char) (mv & 0xFF), 0 };
+      for (int i = 0; i < 5; i++) {
+        if (i != 2 && (buf[i] < '0' || buf[i] > '9')) return {"Non valido"};
+      }
+      return {std::string(buf)};
+
+  - platform: template
+    name: "Inizio Carica 2"
+    icon: mdi:clock-outline
+    entity_category: diagnostic
+    update_interval: 10s
+    lambda: |-
+      float h = id(r2736).state, m = id(r2737).state;
+      if (isnan(h) || isnan(m)) return {"Sconosciuto"};
+      int hv = (int) h, mv = (int) m;
+      char buf[6] = { (char) (hv >> 8), (char) (hv & 0xFF), ':',
+                      (char) (mv >> 8), (char) (mv & 0xFF), 0 };
+      for (int i = 0; i < 5; i++) {
+        if (i != 2 && (buf[i] < '0' || buf[i] > '9')) return {"Non valido"};
+      }
+      return {std::string(buf)};
+
+  - platform: template
+    name: "Fine Carica 2"
+    icon: mdi:clock-outline
+    entity_category: diagnostic
+    update_interval: 10s
+    lambda: |-
+      float h = id(r2738).state, m = id(r2739).state;
+      if (isnan(h) || isnan(m)) return {"Sconosciuto"};
+      int hv = (int) h, mv = (int) m;
+      char buf[6] = { (char) (hv >> 8), (char) (hv & 0xFF), ':',
+                      (char) (mv >> 8), (char) (mv & 0xFF), 0 };
+      for (int i = 0; i < 5; i++) {
+        if (i != 2 && (buf[i] < '0' || buf[i] > '9')) return {"Non valido"};
+      }
+      return {std::string(buf)};
+
+  - platform: template
+    name: "Inizio Scarica 2"
+    icon: mdi:clock-outline
+    entity_category: diagnostic
+    update_interval: 10s
+    lambda: |-
+      float h = id(r2740).state, m = id(r2741).state;
+      if (isnan(h) || isnan(m)) return {"Sconosciuto"};
+      int hv = (int) h, mv = (int) m;
+      char buf[6] = { (char) (hv >> 8), (char) (hv & 0xFF), ':',
+                      (char) (mv >> 8), (char) (mv & 0xFF), 0 };
+      for (int i = 0; i < 5; i++) {
+        if (i != 2 && (buf[i] < '0' || buf[i] > '9')) return {"Non valido"};
+      }
+      return {std::string(buf)};
+
+  - platform: template
+    name: "Fine Scarica 2"
+    icon: mdi:clock-outline
+    entity_category: diagnostic
+    update_interval: 10s
+    lambda: |-
+      float h = id(r2742).state, m = id(r2743).state;
+      if (isnan(h) || isnan(m)) return {"Sconosciuto"};
+      int hv = (int) h, mv = (int) m;
+      char buf[6] = { (char) (hv >> 8), (char) (hv & 0xFF), ':',
+                      (char) (mv >> 8), (char) (mv & 0xFF), 0 };
+      for (int i = 0; i < 5; i++) {
+        if (i != 2 && (buf[i] < '0' || buf[i] > '9')) return {"Non valido"};
+      }
+      return {std::string(buf)};
+
+  
+# =========================================================
+# TIME + BINARY SENSOR
+# =========================================================
+time:
+  - platform: homeassistant
+    id: homeassistant_time
+
+binary_sensor:
+  - platform: status
+    name: "Stato ESP RS485"

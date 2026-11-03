@@ -10,16 +10,27 @@ globals:
     type: bool
     restore_value: true
     initial_value: "false"
+  # Ultimo valore scelto per "Sorgente Carica: Rete + PV" (registro 2955).
+  - id: sorgente_rete_pv
+    type: bool
+    restore_value: true
+    initial_value: "true"
+  # Fasce attese dopo una scrittura (16 registri 2728-2743), per la verifica.
+  - id: fasce_attese
+    type: std::vector<uint16_t>
 
 esphome:
   name: inverter-esp
   friendly_name: Inverter Energia
   project:
     name: lillo83.zonergy_venus
-    version: "0.1.7"
+    version: "0.3.0"
   on_boot:
     priority: -100
     then:
+      - switch.template.publish:
+          id: carica_rete
+          state: OFF
       - if:
           condition:
             lambda: "return id(carica_rete_attiva);"
@@ -872,7 +883,9 @@ sensor:
 # =========================================================
 # TEMPLATE (segni potenza + energie giornaliere)
 # =========================================================
-  # Rete - Prelievo (valori positivi)
+  # Registro 2403: negativo quando si compra dalla rete, positivo quando
+  # si vende (verificato confrontandolo con l'energia acquistata).
+  # Rete - Prelievo (valori negativi trasformati in positivi)
   - platform: template
     name: "Potenza Prelievo Rete"
     id: potenza_prelievo_rete
@@ -881,9 +894,9 @@ sensor:
     state_class: measurement
     lambda: |-
       float v = id(potenza_attiva_rete).state;
-      return (isnan(v) || v <= 0) ? 0.0 : v;
+      return (isnan(v) || v >= 0) ? 0.0 : -v;
 
-  # Rete - Immissione (valori negativi trasformati in positivi)
+  # Rete - Immissione (valori positivi)
   - platform: template
     name: "Potenza Immissione Rete"
     id: potenza_immissione_rete
@@ -892,7 +905,7 @@ sensor:
     state_class: measurement
     lambda: |-
       float v = id(potenza_attiva_rete).state;
-      return (isnan(v) || v >= 0) ? 0.0 : -v;
+      return (isnan(v) || v <= 0) ? 0.0 : v;
 
   # Batteria - Carica
   - platform: template
@@ -986,26 +999,49 @@ sensor:
 # =========================================================
 # SWITCH (scrittura)
 # =========================================================
+# I registri di comando (2955, 2956, 2957, 2962) non si possono rileggere:
+# l'inverter risponde con eccezione 2. Per questo i comandi sono di sola
+# scrittura e mostrano l'ultimo valore inviato, ricordato anche dopo un riavvio.
 switch:
-  - platform: modbus_controller
-    modbus_controller_id: inverter
+  - platform: template
     name: "Sorgente Carica: Rete + PV"
     id: sorgente_carica_rete_pv
-    register_type: holding
-    address: 2955
-    write_lambda: |-
-      // 0 = Rete + PV | 1 = Solo PV
-      return x ? 0 : 1;
+    entity_category: config
+    restore_mode: DISABLED
+    lambda: "return id(sorgente_rete_pv);"
+    turn_on_action:
+      # 0 = Rete + PV
+      - lambda: |-
+          id(inverter)->queue_command(
+              modbus_controller::ModbusCommandItem::create_write_single_command(
+                  id(inverter), 2955, 0));
+          id(sorgente_rete_pv) = true;
+    turn_off_action:
+      # 1 = Solo PV
+      - lambda: |-
+          id(inverter)->queue_command(
+              modbus_controller::ModbusCommandItem::create_write_single_command(
+                  id(inverter), 2955, 1));
+          id(sorgente_rete_pv) = false;
 
-  - platform: modbus_controller
-    modbus_controller_id: inverter
+  # Sperimentale: in Autoconsumo non ha avviato la carica. Per caricare dalla
+  # rete usa "Carica Batteria da Rete". All'avvio scrive 0 (spenta).
+  - platform: template
     name: "Forza Carica Batteria"
     id: forza_carica
-    register_type: holding
-    address: 2956
-    write_lambda: |-
-      // 1 = Carica forzata | 0 = Disattiva
-      return x ? 1 : 0;
+    entity_category: config
+    optimistic: true
+    restore_mode: ALWAYS_OFF
+    turn_on_action:
+      - lambda: |-
+          id(inverter)->queue_command(
+              modbus_controller::ModbusCommandItem::create_write_single_command(
+                  id(inverter), 2956, 1));
+    turn_off_action:
+      - lambda: |-
+          id(inverter)->queue_command(
+              modbus_controller::ModbusCommandItem::create_write_single_command(
+                  id(inverter), 2956, 0));
     on_turn_on:
       - script.execute: timeout_carica_forzata
     on_turn_off:
@@ -1020,7 +1056,8 @@ switch:
     name: "Carica Batteria da Rete"
     id: carica_rete
     icon: mdi:battery-charging-high
-    restore_mode: ALWAYS_OFF
+    # Nessuna azione all'avvio: lo stato OFF viene pubblicato in on_boot.
+    restore_mode: DISABLED
     turn_on_action:
       - if:
           condition:
@@ -1036,6 +1073,7 @@ switch:
             - delay: 5s
             - script.execute: scrivi_fasce_carica
             - delay: 5s
+            - script.execute: verifica_fasce
             - select.set:
                 id: modalita_inverter
                 option: "TOU"
@@ -1097,10 +1135,46 @@ script:
             id(inverter)->queue_command(
                 modbus_controller::ModbusCommandItem::create_write_multiple_command(
                     id(inverter), 2736, 8, blocco(c2s, c2e)));
+            // Tentativo aggiuntivo: periodo 1 e 2 in un solo blocco da 16
+            // registri. Se l'inverter lo rifiuta, il periodo 1 è già scritto.
+            std::vector<uint16_t> tutto = blocco(c1s, c1e);
+            std::vector<uint16_t> p2 = blocco(c2s, c2e);
+            tutto.insert(tutto.end(), p2.begin(), p2.end());
+            id(fasce_attese) = tutto;
+            id(inverter)->queue_command(
+                modbus_controller::ModbusCommandItem::create_write_multiple_command(
+                    id(inverter), 2728, 16, tutto));
             ESP_LOGW("carica_rete", "Carica %02d:%02d-%02d:%02d / %02d:%02d-%02d:%02d, scarica %02d:%02d-%02d:%02d",
                      c1s / 60, c1s % 60, c1e / 60, c1e % 60, c2s / 60, c2s % 60,
                      c2e / 60, c2e % 60, ds / 60, ds % 60, de / 60, de % 60);
             id(carica_rete_attiva) = true;
+
+  # Controlla che l'inverter abbia davvero le fasce scritte e lo pubblica in
+  # "Esito Scrittura Fasce" (leggibile da Home Assistant, senza log).
+  - id: verifica_fasce
+    mode: restart
+    then:
+      - text_sensor.template.publish:
+          id: esito_fasce
+          state: "Verifica in corso..."
+      - delay: 25s
+      - lambda: |-
+          const auto &att = id(fasce_attese);
+          if (att.size() != 16) return;
+          sensor::Sensor *r[16] = {
+              id(r2728), id(r2729), id(r2730), id(r2731),
+              id(r2732), id(r2733), id(r2734), id(r2735),
+              id(r2736), id(r2737), id(r2738), id(r2739),
+              id(r2740), id(r2741), id(r2742), id(r2743)};
+          bool ok1 = true, ok2 = true;
+          for (int i = 0; i < 16; i++) {
+            bool ok = !isnan(r[i]->state) && (uint16_t) r[i]->state == att[i];
+            if (i < 8) ok1 = ok1 && ok; else ok2 = ok2 && ok;
+          }
+          std::string esito = std::string("Periodo 1 ") + (ok1 ? "OK" : "NON scritto") +
+                              " · Periodo 2 " + (ok2 ? "OK" : "NON scritto");
+          ESP_LOGW("carica_rete", "Verifica fasce: %s", esito.c_str());
+          id(esito_fasce).publish_state(esito);
 
   - id: fine_carica_rete
     mode: restart
@@ -1162,36 +1236,54 @@ number:
     restore_value: true
     mode: box
 
-  - platform: modbus_controller
-    modbus_controller_id: inverter
+  # Registro 2957 = "Potenza di carica" dell'app Zonergy (verificato:
+  # impostando 1500 W la batteria carica a circa 1500 W).
+  - platform: template
     name: "Potenza Carica Forzata"
     id: potenza_carica_forzata
+    icon: mdi:lightning-bolt-outline
     unit_of_measurement: "W"
-    address: 2957
-    register_type: holding
-    value_type: U_WORD
     min_value: 100
     max_value: 5000
-    step: 100
+    step: 50
+    initial_value: 2500
+    optimistic: true
+    restore_value: true
     mode: box
+    set_action:
+      - lambda: |-
+          id(inverter)->queue_command(
+              modbus_controller::ModbusCommandItem::create_write_single_command(
+                  id(inverter), 2957, (uint16_t) x));
 
-  - platform: modbus_controller
-    modbus_controller_id: inverter
+  - platform: template
     name: "Limite Carica da Rete"
     id: limite_carica_rete
+    entity_category: config
     unit_of_measurement: "W"
-    address: 2962
-    register_type: holding
-    value_type: U_WORD
     min_value: 0
     max_value: 5000
     step: 100
+    initial_value: 0
+    optimistic: true
+    restore_value: true
     mode: box
+    set_action:
+      - lambda: |-
+          id(inverter)->queue_command(
+              modbus_controller::ModbusCommandItem::create_write_single_command(
+                  id(inverter), 2962, (uint16_t) x));
 
 # =========================================================
 # TEXT SENSOR (stati leggibili)
 # =========================================================
 text_sensor:
+  - platform: template
+    name: "Esito Scrittura Fasce"
+    id: esito_fasce
+    icon: mdi:clipboard-check-outline
+    entity_category: diagnostic
+
   - platform: template
     name: "Stato Sistema"
     lambda: |-

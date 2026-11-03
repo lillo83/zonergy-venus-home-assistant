@@ -1,5 +1,43 @@
 # Changelog
 
+## 0.3.0-beta.1
+
+Charging from the grid on demand through the ESP8266 RS485 gateway. Tested on
+a Zonergy Venus6000-S1; the BLE firmware and the cloud connection are
+unchanged.
+
+- adds a `select` platform to the integration, used by the new
+  `Modalità Inverter` entity (Autoconsumo / TOU)
+- companion ESP8266 firmware:
+  - adds `Carica Batteria da Rete` with `Durata Carica da Rete`: it writes a
+    charge window from the current time for the chosen duration, switches the
+    inverter to TOU and returns it to self-consumption when the time is up,
+    when switched off, or after a restart of the ESP8266
+  - adds `Modalità Inverter` (register 2300: 0 = Autoconsumo, 1 = TOU),
+    captured from the frames sent by the original Wi-Fi dongle
+  - reads the two charge and discharge periods (registers 2728-2743, stored
+    as ASCII digits) and shows them as `HH:MM`
+  - adds `Esito Scrittura Fasce`, which reports whether each period was
+    actually written
+  - confirms that register 2957 (`Potenza Carica Forzata`) is the charging
+    power set in the Zonergy app
+  - makes the write-only controls (2955, 2956, 2957, 2962) template entities
+    that remember the last value sent; the inverter rejects reads of these
+    registers, which previously produced an error every polling cycle
+  - turns `Forza Carica Batteria` off after a configurable maximum time or
+    when Home Assistant disconnects
+  - fixes the sign of `Potenza Prelievo Rete` and `Potenza Immissione Rete`
+    (register 2403 is negative while importing), and therefore the daily
+    imported and exported energy computed from them
+- adds `zonergy-venus-esp8266-controlli.yaml`, a controls-only variant for
+  installations that already read the inverter with the ESP32 Bluetooth
+  firmware
+
+Known limitation: on the tested inverter, the ESP8266 writes period 1 but the
+write of period 2 (2736-2743) is not applied. `Carica Batteria da Rete` works
+as long as period 2 in the Zonergy app does not overlap the requested charge
+window (for example charge 00:00-06:00, discharge 22:00-23:59).
+
 ## 0.2.0
 
 First stable release of the 0.2 series. It contains everything published in
