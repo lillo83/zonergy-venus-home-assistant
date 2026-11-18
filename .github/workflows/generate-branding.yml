@@ -1,0 +1,42 @@
+name: Generate integration branding
+on:
+  push:
+    paths:
+      - assets/zonergy-venus-icon.svg
+      - assets/zonergy-venus-banner.svg
+      - .github/workflows/generate-branding.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  branding:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install SVG renderer
+        run: pip install cairosvg==2.7.1
+      - name: Render Home Assistant brand assets
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import cairosvg
+          base = Path("custom_components/zonergy_venus/brand")
+          base.mkdir(parents=True, exist_ok=True)
+          source = "assets/zonergy-venus-icon.svg"
+          for name, size in (("icon.png", 256), ("icon@2x.png", 512)):
+              cairosvg.svg2png(url=source, write_to=str(base/name), output_width=size, output_height=size)
+          source = "assets/zonergy-venus-banner.svg"
+          for name, width in (("logo.png", 768), ("logo@2x.png", 1536)):
+              cairosvg.svg2png(url=source, write_to=str(base/name), output_width=width)
+          PY
+      - name: Commit brand PNGs
+        run: |
+          git add custom_components/zonergy_venus/brand/
+          if git diff --cached --quiet; then exit 0; fi
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -m "Add Home Assistant integration brand PNG assets"
+          git push
