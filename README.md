@@ -1,3 +1,7 @@
+![Zonergy Venus — Home Assistant integration](assets/zonergy-venus-banner.svg)
+
+<p align="center"><img src="assets/zonergy-venus-icon.svg" alt="Zonergy Venus icon" width="112"></p>
+
 # Zonergy Venus for Home Assistant
 
 Custom integration for **Zonergy Venus hybrid inverters**. It supports a local
