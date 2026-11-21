@@ -29,6 +29,7 @@ MODULES = (
     "binary_sensor",
     "switch",
     "number",
+    "select",
     "config_flow",
 )
 
@@ -125,6 +126,10 @@ async def check_client_api() -> None:
     check_call(
         "APIClient.switch_command(key, state, device_id=...)",
         lambda: client.switch_command(1, True, device_id=0),
+    )
+    check_call(
+        "APIClient.select_command(key, state, device_id=...)",
+        lambda: client.select_command(1, "Autoconsumo", device_id=0),
     )
     for name in ("device_info_and_list_entities", "subscribe_states"):
         if not hasattr(APIClient, name):
